@@ -12,10 +12,11 @@ import logging
 import os
 from datetime import datetime
 
-import bm3d
 import numpy as np
 from PIL import Image
-
+import matplotlib.pyplot as plt
+import bm3d
+import cv2
 
 def setup_logging(log_level: str = "INFO"):
     """
@@ -45,26 +46,28 @@ def loadImage(image_path: str) -> np.ndarray:
     Load image by path and return as ndarray
     """
     try:
+        img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
         logging.info(f"Loading image {image_path}")
         # Open grayscaled image
-        return np.array(Image.open(image_path).convert("L"))
+        return img
     except Exception as e:
         logging.error(f"Error during image loading: {e}")
         raise Exception(f"Error during image loading: {e}")
 
 
-def main(inputImage: str = "data/cameraman256.png", noiseVariance: int = 25) -> None:
+def main(imagePath: str = "data/cameraman256.png", noiseVariance: int = 25) -> None:
     """
     Load image, apply noise, denoise by BM3D and calculate metrics
     """
     try:
-        originalImage: np.ndarray = loadImage(inputImage)
+        originalImage: np.ndarray = loadImage(imagePath)
 
-        noise: np.ndarray = bm3d.generateNoise(noiseVariance, originalImage.shape)
-        noisyImage: np.ndarray = np.atleast_3d(originalImage + noise)
+        noisyImage: np.ndarray = bm3d.addNoise(originalImage, noiseVariance)
 
         denoisedImage: np.ndarray = bm3d.bm3d(noisyImage, noiseVariance)
+
         psnr: float = bm3d.calculatePSNR(originalImage, denoisedImage)
+
     except Exception as e:
         logging.error(f"An error occurred during the process: {e}")
         raise Exception(f"An error occurred during the process: {e}")
