@@ -9,18 +9,7 @@ import cv2
 import time
 from multiprocessing import Pool, cpu_count
 from typing import Callable, Any, Tuple
-
-
-def measureTime(func: Callable, *args, **kwargs) -> Tuple[Any, float]:
-    """
-    Measure the execution time of a given function.
-    """
-    startTime = time.perf_counter() 
-    result = func(*args, **kwargs)  
-    endTime = time.perf_counter()  
-    elapsedTime = endTime - startTime
-
-    return result, elapsedTime
+from bm3d import measureTime
 
 
 def findSimilarSingleThread(image, refBlockCoords, blockSize=16, threshold=2000):

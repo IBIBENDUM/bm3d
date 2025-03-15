@@ -8,18 +8,7 @@ import cv2
 import numpy as np
 import time
 from typing import Callable, Any, List, Tuple
-
-
-def measureTime(func: Callable, *args, **kwargs) -> Tuple[Any, float]:
-    """
-    Measure the execution time of a given function.
-    """
-    startTime = time.perf_counter() 
-    result = func(*args, **kwargs)  
-    endTime = time.perf_counter()  
-    elapsedTime = endTime - startTime
-
-    return result, elapsedTime
+from bm3d import measureTime
 
 
 def blockMatchingOpenCV(image, refBlockCoords, blockSize=16, threshold=0.8, method=cv2.TM_CCOEFF_NORMED):
