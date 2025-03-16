@@ -2,30 +2,31 @@
     Contains bm3d properties and predefined profiles
 """
 
+class PositiveIntDescriptor:
+    def __init__(self, name):
+        self.name = name
+
+    def __get__(self, obj, objtype):
+        return getattr(obj, f"_{self.name}")
+
+    def __set__(self, obj, value):
+        if value <= 0:
+            raise ValueError(f"{self.name} must be a positive integer")
+        setattr(obj, f"_{self.name}", value)
+
 # TODO: Add profiles fast and normal
 class BM3DProfile:
-    __slots__ = ('_blockSize', '_distanceThreshold')
+    __slots__ = ("_blockSize", "_distanceThreshold", "_filterThreshold", "_groupMaxSize")
 
-    def __init__(self, blockSize: int=16, distanceThreshold: int = 500):
+    blockSize = PositiveIntDescriptor("blockSize")
+    groupMaxSize = PositiveIntDescriptor("groupMaxSize")
+    distanceThreshold = PositiveIntDescriptor("distanceThreshold")
+    filterThreshold = PositiveIntDescriptor("filterThreshold")
+
+    def __init__(self, blockSize: int=16, distanceThreshold: int=500, filterThreshold: float=10.00,
+                 groupMaxSize: int = 16):
         self._blockSize = blockSize
+        self._groupMaxSize = groupMaxSize
         self._distanceThreshold = distanceThreshold
+        self._filterThreshold = filterThreshold
 
-    @property
-    def blockSize(self) -> int:
-        return self._blockSize
-
-    @blockSize.setter
-    def blockSize(self, value: int):
-        if value <= 0:
-            raise ValueError("Block size must be a positive integer")
-        self._blockSize = value
-
-    @property
-    def distanceThreshold(self) -> int:
-        return self._distanceThreshold
-
-    @distanceThreshold.setter
-    def distanceThreshold(self, value: int):
-        if value <= 0:
-            raise ValueError("Distance threshold must be a positive integer")
-        self._blockSize = value

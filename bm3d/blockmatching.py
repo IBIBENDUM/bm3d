@@ -1,25 +1,37 @@
 import numpy as np
+from typing import Tuple
 from .profile import BM3DProfile
 
-def findSimilarBlocks(image: np.ndarray, refBlock: np.ndarray,
-                      matchingBlocks: np.ndarray, profile: BM3DProfile) -> list:
+def findSimilarBlocksCoords(refBlock: np.ndarray, matchingBlocks: np.ndarray,
+                      profile: BM3DProfile) -> np.ndarray:
     diff = np.sum((matchingBlocks - refBlock) ** 2, axis=(2, 3), dtype=np.int64)
-    similarIndices = np.argwhere(diff < profile.distanceThreshold * profile.blockSize)
+    return np.argwhere(diff < profile.distanceThreshold * profile.blockSize ** 2)
 
-    return [tuple(idx) for idx in similarIndices]
 
-def findSimilarGroups(image: np.ndarray, profile: BM3DProfile) -> list:
+def findSimilarGroups(image: np.ndarray, profile: BM3DProfile) -> Tuple:
+
+    # Get all possible blocks
     blocks: np.ndarray = np.lib.stride_tricks.sliding_window_view(
         image, (profile.blockSize, profile.blockSize)
     )
     
-    groups = [] # TODO: Add max size and make with numpy
-    for y in range(0, blocks.shape[0], 100):
-        for x in range(0, blocks.shape[1], 100):
-            refBlock = blocks[y, x] 
-            similarBlocks = findSimilarBlocks(image, refBlock, blocks, profile)
-            groups.append(similarBlocks)
+    similarBlocksCoords = []
+    similarGroups = []
 
-    return groups
-    
+    for y in range(1):
+        for x in range(1):
+            refBlock = blocks[y, x] 
+            coords = findSimilarBlocksCoords(refBlock, blocks, profile)
+
+            if coords.shape[0] > profile.groupMaxSize:
+               coords = coords[:profile.groupMaxSize]
+
+            similarBlocksCoords.append(coords)
+
+            group = blocks[coords[:, 0], coords[:, 1]]
+            similarGroups.append(group)
+        
+
+    return similarBlocksCoords, similarGroups
+
     
