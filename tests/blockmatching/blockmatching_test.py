@@ -17,6 +17,6 @@ if __name__ == "__main__":
     profile = BM3DProfile()
     bmResult, bmTime = measureTime(findSimilarGroups, image, profile)
     
-    print(bmResult[0])
+    # print(bmResult[0])
     # cv2.imwrite("result.png", visualizeBM(image, bmResult[0][0], profile.blockSize))
     

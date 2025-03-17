@@ -26,7 +26,6 @@ def applyHaar(signal: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     return pywt.dwt(signal, 'haar')
 
 def applyInverseHaar(signal: np.ndarray) -> List:
-    print(signal.shape)
     return pywt.idwt(signal[0], signal[1], 'haar')
 
 def applyToGroups1DInverseTransform(groups: List, oldGroups: List) -> List:
@@ -35,7 +34,7 @@ def applyToGroups1DInverseTransform(groups: List, oldGroups: List) -> List:
         cA = group[:, 0, :]
         cD = group[:, 1, :]
         restoredSignals = pywt.idwt(cA, cD, 'haar')
-        reshapedCoeffs = restoredSignals.reshape(oldGroups[i].shape)
+        reshapedCoeffs = restoredSignals.T.flatten().reshape(oldGroups[i].shape)
         inversedGroups.append(reshapedCoeffs)
     return inversedGroups
 

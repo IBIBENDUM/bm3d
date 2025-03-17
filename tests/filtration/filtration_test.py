@@ -10,18 +10,21 @@ if __name__ == "__main__":
     bmResult, bmTime = measureTime(findSimilarGroups, image, profile)
 
     transformedGroups2D = applyToGroups2DCT(bmResult[1])
-    print(f"transformedCoeffs2D: {transformedGroups2D[0].shape}")
+    # print(f"transformedCoeffs2D: {bmResult[1][0][0]}")
 
     transformedCoeffs1D = applyToGroups1DTransform(transformedGroups2D)
-    print(transformedCoeffs1D[0].shape)
-
+    # print(transformedCoeffs1D[0])
+    #
     filteredCoeffs1D = applyHTtoGroups(transformedCoeffs1D, profile)
-    print(f"filteredCoeffs1D: {filteredCoeffs1D[0].shape}")
+    # print(f"filteredCoeffs1D: {filteredCoeffs1D[0].shape}")
+    #
+    # weights = calculateBlocksWeights(filteredCoeffs1D, 10)
+    # print(f"weights: {weights[0]}")
+    #
+    filteredCoeffs2D = applyToGroups1DInverseTransform(transformedCoeffs1D, bmResult[1])
+    # print(f"filteredCoeffs2D: {filteredCoeffs2D[0]}")
 
-    filteredCoeffs2D = applyToGroups1DInverseTransform(filteredCoeffs1D, bmResult[1])
-    print(f"filteredCoeffs2D: {filteredCoeffs2D[0].shape}")
-
-    filteredImage = applyToGroupsInverse2DCT(filteredCoeffs2D)
-    print(f"filteredImage: {filteredImage[0].shape}")
+    filteredImage = applyToGroupsInverse2DCT(transformedGroups2D)
+    # print(f"filteredImage: {filteredImage[0][0]}")
 
 

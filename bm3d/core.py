@@ -4,6 +4,7 @@ from .blockmatching import findSimilarGroups
 from .profile import BM3DProfile
 from .transforms import *
 from .filtration import *
+from .agregation import *
 
 
 def bm3d(noisyImage: np.ndarray, noiseVariance: float,
@@ -15,19 +16,20 @@ def bm3d(noisyImage: np.ndarray, noiseVariance: float,
 
 def _bm3dBasic(noisyImage: np.ndarray, noiseVariance: float,
          profile: BM3DProfile) -> np.ndarray:
-    similarBlocksCoords, similarGroups = findSimilarGroups(noisyImage, profile)
+    groupsCoords, groups = findSimilarGroups(noisyImage, profile)
 
-    transformedGroups2D = applyToGroups2DCT(similarGroups)
+    transformedGroups2D = applyToGroups2DCT(groups)
 
     transformedCoeffs1D = applyToGroups1DTransform(transformedGroups2D)
 
-    filteredCoeffs1D = applyHardThresholdingFilter(transformedCoeffs1D, profile)
+    filteredCoeffs1D = applyHTtoGroups(transformedCoeffs1D, profile)
+    weights = calculateBlocksWeights(filteredCoeffs1D, noiseVariance)
 
-    filteredCoeffs2D = applyToGroup1DInverseTransform(filteredCoeffs1D, similarGroups.shape)
+    filteredCoeffs2D = applyToGroups1DInverseTransform(filteredCoeffs1D, groups)
 
-    filteredImage = applyToGroupInverse2DCT(filteredCoeffs2D)
+    filteredGroups = applyToGroupsInverse2DCT(filteredCoeffs2D)
 
-    return filteredImage
+    imageBasic = agregationBasic(noisyImage.shape, filteredGroups,
+                                 groupsCoords, weights)
+    return imageBasic
 
-
-    return similarGroups
