@@ -29,6 +29,8 @@ def main(imagePath: str = "data/cameraman256.png", noiseVariance: int = 25) -> N
 
         profile = bm3d.BM3DProfile()
         denoisedImage: np.ndarray = bm3d.bm3d(noisyImage, noiseVariance, profile)
+        print(denoisedImage)
+        cv2.imwrite("noisyImage.png", noisyImage)
         cv2.imwrite("result.png", denoisedImage.astype(np.uint8))
 
         psnr: float = bm3d.calculatePSNR(originalImage, denoisedImage)
@@ -96,7 +98,7 @@ def parseArguments() -> argparse.Namespace:
         "-s",
         "--sigma",
         type=int,
-        default=25,
+        default=10,
         help="Noise variance",
         metavar="\b",
     )

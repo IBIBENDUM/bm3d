@@ -1,35 +1,36 @@
+"""
+Implementation of BM3D method for removing noise from images.
+The algorithm consists of two stages: basic and final.
+"""
+
 import numpy as np
 
-from .blockmatching import findSimilarGroups
 from .profile import BM3DProfile
-from .transforms import *
-from .filtration import *
-from .agregation import *
+from .blockmatching import findSimilarGroups
+from .filtration import applyFilterInTransformDomain
+from .agregation import agregationBasic
 
 
 def bm3d(noisyImage: np.ndarray, noiseVariance: float,
          profile: BM3DProfile) -> np.ndarray:
+    """
+    Apply BM3D method to denoise image
+    """
 
     basicImage: np.ndarray = _bm3dBasic(noisyImage, noiseVariance, profile)
 
     return basicImage
 
 def _bm3dBasic(noisyImage: np.ndarray, noiseVariance: float,
-         profile: BM3DProfile) -> np.ndarray:
+               profile: BM3DProfile) -> np.ndarray:
+    """
+    Perform basic step of the BM3D
+    """
     groupsCoords, groups = findSimilarGroups(noisyImage, profile)
 
-    transformedGroups2D = applyToGroups2DCT(groups)
-
-    transformedCoeffs1D = applyToGroups1DTransform(transformedGroups2D)
-
-    filteredCoeffs1D = applyHTtoGroups(transformedCoeffs1D, profile)
-    weights = calculateBlocksWeights(filteredCoeffs1D, noiseVariance)
-
-    filteredCoeffs2D = applyToGroups1DInverseTransform(filteredCoeffs1D, groups)
-
-    filteredGroups = applyToGroupsInverse2DCT(filteredCoeffs2D)
+    filteredGroups, weights = applyFilterInTransformDomain(groups, noiseVariance, profile)
 
     imageBasic = agregationBasic(noisyImage.shape, filteredGroups,
-                                 groupsCoords, weights)
+                                 groupsCoords, weights, profile)
     return imageBasic
 
