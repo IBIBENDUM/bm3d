@@ -19,16 +19,17 @@ import bm3d
 from bm3d.profile import BM3DStages
 
 
-def main(imagePath: str = "data/cameraman256.png", noiseVariance: int = 25) -> None:
+def main(imagePath: str="data/cameraman256.png", noiseVariance: int=25) -> None:
     """
     Load image, apply noise, denoise by BM3D and calculate metrics
     """
+
     try:
         originalImage = loadImage(imagePath)
 
         noisyImage = bm3d.addNoise(originalImage, noiseVariance)
 
-        profile = bm3d.BM3DProfile(searchWindow=4, stages=BM3DStages.BASIC_STAGE)
+        profile = bm3d.BM3DProfile(searchWindow=4, blockStep=16, stages=BM3DStages.BOTH_STAGES)
         denoisedImage, timeResult = bm3d.measureTime(bm3d.bm3d, noisyImage, noiseVariance, profile)
         cv2.imwrite("noisyImage.png", noisyImage)
         cv2.imwrite("result.png", denoisedImage)
@@ -46,11 +47,12 @@ def loadImage(image_path: str) -> np.ndarray:
     """
     Load image by path and return as ndarray
     """
+
     try:
         img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
         logging.info(f"Loading image {image_path}")
-        # Open grayscaled image
         return img
+
     except Exception as e:
         logging.error(f"Error during image loading: {e}")
         raise Exception(f"Error during image loading: {e}")
@@ -60,8 +62,11 @@ def setupLogging(logLevel: str="INFO"):
     """
     Configure logging to save into file and print into console
     Logs saved in "logs" directory with timestamp in filename
-    :param logLevel: log level from "logging"
+
+    Args:
+        logLevel: log level from "logging"
     """
+
     # Create a logs directory if it doesn't exist
     logsDir = "logs"
     if not os.path.exists(logsDir):
@@ -82,8 +87,10 @@ def setupLogging(logLevel: str="INFO"):
 def parseArguments() -> argparse.Namespace:
     """
     Parse command-line arguments
-    :return: parsed arguments
+
+    Return: parsed arguments
     """
+
     parser = argparse.ArgumentParser(
         description="BM3D image denoising demonstration",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,

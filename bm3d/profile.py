@@ -34,22 +34,15 @@ class BM3DProfile:
         "_distanceThreshold",
         "_filterThreshold",
         "_groupMaxSize",
+        "_kaiserShape",
         "_stages",
     )
 
     blockSize = PositiveIntDescriptor("blockSize")
     blockStep = PositiveIntDescriptor("blockStep")
     searchWindow = PositiveIntDescriptor("searchWindow")
-    groupMaxSize = PositiveIntDescriptor("groupMaxSize")
     distanceThreshold = PositiveIntDescriptor("distanceThreshold")
-
-    @property
-    def stages(self) -> BM3DStages:
-        return self._stages
-
-    @stages.setter
-    def stages(self, value: BM3DStages):
-        self._stages = value
+    groupMaxSize = PositiveIntDescriptor("groupMaxSize")
 
     @property
     def filterThreshold(self) -> float:
@@ -59,6 +52,22 @@ class BM3DProfile:
     def filterThreshold(self, value: float):
         self._filterThreshold = value
 
+    @property
+    def kaiserShape(self) -> float:
+        return self._kaiserShape
+
+    @kaiserShape.setter
+    def kaiserShape(self, value: float):
+        self._kaiserShape = value
+
+    @property
+    def stages(self) -> BM3DStages:
+        return self._stages
+
+    @stages.setter
+    def stages(self, value: BM3DStages):
+        self._stages = value
+
     def __init__(
         self,
         blockSize: int = 16,
@@ -66,7 +75,8 @@ class BM3DProfile:
         groupMaxSize: int = 16,
         searchWindow: int = 39,
         distanceThreshold: int = 100,
-        filterThreshold: float = 3.00,
+        filterThreshold: float = 3.0,
+        kaiserShape: float = 2.0,
         stages: BM3DStages = BM3DStages.BOTH_STAGES,
     ):
         self._blockSize = blockSize
@@ -75,4 +85,5 @@ class BM3DProfile:
         self._searchWindow = searchWindow
         self._distanceThreshold = distanceThreshold
         self._filterThreshold = filterThreshold
+        self._kaiserShape = kaiserShape
         self._stages = stages

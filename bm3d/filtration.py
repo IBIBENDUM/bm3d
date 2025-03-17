@@ -107,6 +107,7 @@ def applyFilterHt(groups: List[np.ndarray], noiseVariance: float,
 
     return filteredGroups, weights
 
+
 def applyFilterWie(groupsEstimate: List[np.ndarray],
                    groupsImage: List[np.ndarray],
                    noiseVariance: float) -> Tuple[List, List]:
@@ -136,3 +137,4 @@ def applyFilterWie(groupsEstimate: List[np.ndarray],
     filteredGroups = applyToGroupsInverse2DCT(filteredCoeffs2D)
 
     return filteredGroups, weights
+

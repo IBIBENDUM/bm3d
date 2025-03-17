@@ -75,6 +75,7 @@ def findSimilarGroups(image: np.ndarray, profile: BM3DProfile) -> Tuple[List[np.
         List of coordinate arrays for each group
         List of block arrays for each group
     """
+    # TODO: Add check for last block
     # Get all possible blocks
     blocks: np.ndarray = np.lib.stride_tricks.sliding_window_view(
         image, (profile.blockSize, profile.blockSize)
