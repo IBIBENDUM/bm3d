@@ -7,6 +7,16 @@ from typing import List, Tuple
 import numpy as np
 import pywt
 
+def applyToBlocks2dDct(blocks: np.ndarray) -> np.ndarray:
+    transformedBlocks = np.zeros_like(blocks, dtype=np.float32)
+
+    for i in range(blocks.shape[0]): 
+        for j in range(blocks.shape[1]):
+            block = blocks[i, j]
+            dctBlock = dctn(block, norm='ortho')
+            transformedBlocks[i, j] = dctBlock
+
+    return transformedBlocks
 
 def applyToGroups2DCT(groups: List[np.ndarray]) -> List[np.ndarray]:
     """
@@ -29,7 +39,7 @@ def applyToGroups2DCT(groups: List[np.ndarray]) -> List[np.ndarray]:
     return transformedGroups
 
 
-def applyToGroupsInverse2DCT(groups: List[np.ndarray]) -> List[np.ndarray]:
+def applyToGroupInverse2DCT(group: np.ndarray) -> np.ndarray:
     """
     Apply inverse 2D DCT to each block in list of groups
 
@@ -40,14 +50,12 @@ def applyToGroupsInverse2DCT(groups: List[np.ndarray]) -> List[np.ndarray]:
         List of inverse-transformed groups
     """
 
-    transformedGroups: List[np.ndarray] = []
-    for group in groups:
-        transformedGroup: np.ndarray = np.empty_like(group, dtype=np.float64)
-        for i, block in enumerate(group):
-            transformedGroup[i] = idctn(block, norm='ortho')
-        transformedGroups.append(transformedGroup)
+    transformedGroup: np.ndarray = np.empty_like(group, dtype=np.float64)
 
-    return transformedGroups
+    for i, block in enumerate(group):
+        transformedGroup[i] = idctn(block, norm='ortho')
+
+    return transformedGroup
 
 
 def applyHaar(signal: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -64,8 +72,8 @@ def applyHaar(signal: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     return pywt.dwt(signal, 'haar')
 
 
-# TODO: Use this function for vectorizing
-def applyInverseHaar(signal: np.ndarray) -> np.ndarray:
+def applyInverseHaar(approximationCoeffs: np.ndarray,
+                     detailingCoeffs: np.ndarray) -> np.ndarray:
     """
     Apply inverse 1D Haar Wavelet transform
     
@@ -75,11 +83,11 @@ def applyInverseHaar(signal: np.ndarray) -> np.ndarray:
     Return:
         Array representing reconstructed signal
     """
-    return pywt.idwt(signal[0], signal[1], 'haar')
+    return pywt.idwt(approximationCoeffs, detailingCoeffs, 'haar')
 
 
-def applyToGroups1DInverseTransform(groups: List[np.ndarray],
-                                    oldGroups: List[np.ndarray]) -> List[np.ndarray]:
+def applyToGroups1DInverseTransform(group: np.ndarray,
+                                    oldGroup: np.ndarray) -> np.ndarray:
     """
     Apply inverse 1D Transform to each group in list of groups
 
@@ -90,22 +98,18 @@ def applyToGroups1DInverseTransform(groups: List[np.ndarray],
         List of inverse-transformed groups
     """
 
-    inversedGroups: List[np.ndarray] = []
-    for i, group in enumerate(groups):
-        cA: np.ndarray = group[:, 0, :]
-        cD: np.ndarray = group[:, 1, :]
+    approximationCoeffs: np.ndarray = group[:, 0, :]
+    detailingCoeffs: np.ndarray = group[:, 1, :]    
 
-        restoredSignals: np.ndarray = pywt.idwt(cA, cD, 'haar')
+    restoredSignals: np.ndarray = applyInverseHaar(approximationCoeffs, detailingCoeffs)
 
-        # Reshape coefficients to match original block shape
-        reshapedCoeffs = restoredSignals.T.flatten().reshape(oldGroups[i].shape)
+    # Reshape coefficients to match original block shape
+    reshapedCoeffs = restoredSignals.T.flatten().reshape(oldGroup.shape)
 
-        inversedGroups.append(reshapedCoeffs)
-
-    return inversedGroups
+    return reshapedCoeffs
 
 
-def applyToGroups1DTransform(groups: List[np.ndarray]) -> List[np.ndarray]:
+def applyToGroup1dTransform(group: np.ndarray) -> np.ndarray:
     """
     Apply 1D Transform to each group in list of groups
 
@@ -116,14 +120,11 @@ def applyToGroups1DTransform(groups: List[np.ndarray]) -> List[np.ndarray]:
         List of transformed groups
     """
 
-    transformedGroups: List[np.ndarray] = []
-    for group in groups:
-        # Reshape group to get vertically overlapping pixels become rows
-        groupedCoeffs: np.ndarray = np.transpose(group, (1, 2, 0)).reshape(-1, group.shape[0])
+    # Reshape group to get vertically overlapping pixels become rows
+    groupedCoeffs: np.ndarray = np.transpose(group, (1, 2, 0)).reshape(-1, group.shape[0])
 
-        # Apply Haar Transform to each vertically overlapping pixels
-        transformedGroup: np.ndarray = np.apply_along_axis(applyHaar, axis=1, arr=groupedCoeffs)
+    # Apply Haar Transform to each vertically overlapping pixels
+    transformedGroup: np.ndarray = np.apply_along_axis(applyHaar, axis=1, arr=groupedCoeffs)
 
-        transformedGroups.append(transformedGroup)
 
-    return transformedGroups
+    return transformedGroup

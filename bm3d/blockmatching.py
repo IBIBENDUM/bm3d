@@ -99,7 +99,7 @@ def processBlock(args: Tuple[int, int, np.ndarray, BM3DProfile]) -> Tuple[np.nda
     return similarBlocksCoords, group
 
 
-def findSimilarGroups(image: np.ndarray, profile: BM3DProfile) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+def findSimilarGroups(blocks: np.ndarray, profile: BM3DProfile) -> Tuple[List[np.ndarray], List[np.ndarray]]:
     """
     Find groups of similar block in image
 
@@ -112,15 +112,12 @@ def findSimilarGroups(image: np.ndarray, profile: BM3DProfile) -> Tuple[List[np.
         List of block arrays for each group
     """
 
-    # TODO: Move to better place
-    # Reset task affinity so that all cores are used
-    os.system("taskset -p 0xff %d > /dev/null 2>&1" % os.getpid())
 
     # TODO: Add check for last block
     # Get all possible blocks
-    blocks: np.ndarray = np.lib.stride_tricks.sliding_window_view(
-        image, (profile.blockSize, profile.blockSize)
-    )[:: profile.blockStep, :: profile.blockStep]
+    # blocks: np.ndarray = np.lib.stride_tricks.sliding_window_view(
+    #     image, (profile.blockSize, profile.blockSize)
+    # )[:: profile.blockStep, :: profile.blockStep]
 
     args = [
         (y, x, blocks, profile)
@@ -141,12 +138,8 @@ def findSimilarGroups(image: np.ndarray, profile: BM3DProfile) -> Tuple[List[np.
     return similarBlocksCoords, similarGroups
 
 
-def getGroupsFromCoords(image: np.ndarray, groupsCoords: List[np.ndarray],
+def getGroupsFromCoords(blocks: np.ndarray, groupsCoords: List[np.ndarray],
                         profile: BM3DProfile) -> List[np.ndarray]:
-
-    blocks: np.ndarray = np.lib.stride_tricks.sliding_window_view(
-        image, (profile.blockSize, profile.blockSize)
-    )[::profile.blockStep, ::profile.blockStep]
 
     groups = []
     for coords in groupsCoords:

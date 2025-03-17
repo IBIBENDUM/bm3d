@@ -4,20 +4,22 @@ Functions for applying filtering using transform domain
 
 import numpy as np
 from typing import List, Tuple
+from multiprocessing import Pool, cpu_count
 from .profile import BM3DProfile
+from .blockmatching import getGroupsFromCoords
 from .transforms import *
 
 
-def applyHtToGroups(groups: List[np.ndarray], noiseVariance: float, profile: BM3DProfile) -> List[np.ndarray]:
-    """
-    Apply hard-threshold filter to list of groups
-    """
-
-    filteredCoeffs: List[np.ndarray] = []
-    for group in groups:
-        filteredCoeffs.append(applyFilterToHaar(group, noiseVariance, profile))
-
-    return filteredCoeffs
+# def applyHtToGroups(groups: List[np.ndarray], noiseVariance: float, profile: BM3DProfile) -> List[np.ndarray]:
+#     """
+#     Apply hard-threshold filter to list of groups
+#     """
+#
+#     filteredCoeffs: List[np.ndarray] = []
+#     for group in groups:
+#         filteredCoeffs.append(applyHtToGroup(group, noiseVariance, profile))
+#
+#     return filteredCoeffs
 
 def applyWieToGroups(groupsEstimate: List[np.ndarray], groupsImage: List[np.ndarray],
                      noiseVariance: float) -> Tuple[List[np.ndarray], List[np.ndarray]]:
@@ -34,8 +36,8 @@ def applyWieToGroups(groupsEstimate: List[np.ndarray], groupsImage: List[np.ndar
 
     return filteredCoeffs, weights
 
-def applyFilterToHaar(group: np.ndarray, noiseVariance: float,
-                      profile: BM3DProfile) -> np.ndarray:
+def applyHtToGroup(group: np.ndarray, noiseVariance: float,
+                      profile: BM3DProfile) -> tuple[np.ndarray, float]:
     """
     Apply filter to Haar coefficients
     """
@@ -43,6 +45,7 @@ def applyFilterToHaar(group: np.ndarray, noiseVariance: float,
     approximationCoeffs: np.ndarray = group[:, 0, :]
     detailingCoeffs: np.ndarray = group[:, 1, :]    
 
+    weight = calculateGroupWeight(detailingCoeffs, noiseVariance)
     filteredDetailingCoeffs: np.ndarray = applyHTtoSignal(detailingCoeffs, 
                                                           noiseVariance, profile)
 
@@ -50,7 +53,7 @@ def applyFilterToHaar(group: np.ndarray, noiseVariance: float,
     filtered_group[:, 0, :] = approximationCoeffs 
     filtered_group[:, 1, :] = filteredDetailingCoeffs 
 
-    return filtered_group
+    return filtered_group, weight
 
 
 def applyHTtoSignal(array: np.ndarray, noiseVariance: float,
@@ -62,27 +65,38 @@ def applyHTtoSignal(array: np.ndarray, noiseVariance: float,
     return np.where(abs(array) < noiseVariance * profile.filterThreshold, 0, array)
 
     
-def calculateBlocksWeights(groups: List[np.ndarray],
-                           noiseVariance: float) -> List[float]:
+def calculateGroupWeight(detailingCoeffs: np.ndarray,
+                           noiseVariance: float) -> float:
     """
     Calculate weights for each group based on number of non-zero coefficients
     in transform domain for reference block
     """
 
-    groupsWeights: List[float] = []
-    for group in groups:
-        detailingCoeffs: np.ndarray = group[:, 1, 0]
-        nonZeroCoeffs: int = np.count_nonzero(detailingCoeffs)
-        groupWeight: float = 0.0
-        if nonZeroCoeffs != 0:
-            groupWeight = 1.0 / (nonZeroCoeffs * noiseVariance ** 2)
-        groupsWeights.append(groupWeight)
+    nonZeroCoeffs: int = np.count_nonzero(detailingCoeffs)
+    groupWeight: float = 0.0
+    if nonZeroCoeffs != 0:
+        groupWeight = 1.0 / (nonZeroCoeffs * noiseVariance ** 2)
 
-    return groupsWeights
+    return groupWeight
+
+def filterGroupHt(transformedBlocks: np.ndarray, group: np.ndarray, groupsCoord: np.ndarray,
+                  noiseVariance: float, profile: BM3DProfile) -> Tuple[np.ndarray, float]:
+    indices = groupsCoord // profile.blockStep
+    transformedGroup2D = transformedBlocks[indices[:, 0], indices[:, 1]]
+
+    transformedGroup1D = applyToGroup1dTransform(transformedGroup2D)
+
+    filteredGroup1D, weight = applyHtToGroup(transformedGroup1D, noiseVariance, profile)
+
+    filteredGroup2D = applyToGroups1DInverseTransform(filteredGroup1D, group)
+
+    filteredGroup = applyToGroupInverse2DCT(filteredGroup2D)
+
+    return filteredGroup, weight
 
 
-def applyFilterHt(groups: List[np.ndarray], noiseVariance: float,
-                  profile: BM3DProfile) -> Tuple[List, List]:
+def applyFilterHt(blocks: np.ndarray, groups: List[np.ndarray], groupsCoords: List[np.ndarray],
+                  noiseVariance: float, profile: BM3DProfile) -> Tuple[List, List]:
     """
     Apply Hard-threshold filter to groups using transform domain
 
@@ -95,15 +109,23 @@ def applyFilterHt(groups: List[np.ndarray], noiseVariance: float,
         List of filtered groups 
         List of weight for each group
     """
+    
+    transformedBlocks = applyToBlocks2dDct(blocks)
 
-    transformedGroups2D = applyToGroups2DCT(groups)
-    transformedCoeffs1D = applyToGroups1DTransform(transformedGroups2D)
+    args = [
+        (transformedBlocks, group, groupCoords, noiseVariance, profile)
+        for group, groupCoords in zip(groups, groupsCoords)
+    ]
 
-    filteredCoeffs1D = applyHtToGroups(transformedCoeffs1D, noiseVariance, profile)
-    weights = calculateBlocksWeights(filteredCoeffs1D, noiseVariance)
+    with Pool(processes=cpu_count()) as p:
+        results = p.starmap(filterGroupHt, args)
 
-    filteredCoeffs2D = applyToGroups1DInverseTransform(filteredCoeffs1D, groups)
-    filteredGroups = applyToGroupsInverse2DCT(filteredCoeffs2D)
+    filteredGroups = []
+    weights = []
+
+    for group, weight in results:
+        filteredGroups.append(group)
+        weights.append(weight)
 
     return filteredGroups, weights
 
