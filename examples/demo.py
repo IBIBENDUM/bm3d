@@ -34,6 +34,7 @@ def main(imagePath: str = "data/cameraman256.png", noiseVariance: int = 25) -> N
         print(f"Time spent: {timeResult}")
 
         psnr: float = bm3d.calculatePSNR(originalImage, denoisedImage)
+        print(f"PSNR: {psnr}")
 
     except Exception as e:
         logging.error(f"An error occurred during the process: {e}")
