@@ -23,15 +23,15 @@ def main(imagePath: str = "data/cameraman256.png", noiseVariance: int = 25) -> N
     Load image, apply noise, denoise by BM3D and calculate metrics
     """
     try:
-        originalImage: np.ndarray = loadImage(imagePath)
+        originalImage = loadImage(imagePath)
 
-        noisyImage: np.ndarray = bm3d.addNoise(originalImage, noiseVariance)
+        noisyImage = bm3d.addNoise(originalImage, noiseVariance)
 
         profile = bm3d.BM3DProfile()
-        denoisedImage: np.ndarray = bm3d.bm3d(noisyImage, noiseVariance, profile)
-        print(denoisedImage)
+        denoisedImage, timeResult = bm3d.measureTime(bm3d.bm3d, noisyImage, noiseVariance, profile)
         cv2.imwrite("noisyImage.png", noisyImage)
         cv2.imwrite("result.png", denoisedImage.astype(np.uint8))
+        print(f"Time spent: {timeResult}")
 
         psnr: float = bm3d.calculatePSNR(originalImage, denoisedImage)
 

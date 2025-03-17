@@ -7,7 +7,7 @@ from typing import Tuple, List
 from .profile import BM3DProfile
 
 
-def agregationBasic(imageShape: Tuple[int, int], groups: List[np.ndarray],
+def agregation(imageShape: Tuple[int, int], groups: List[np.ndarray],
                     groupsCoords: List[np.ndarray], weights: List[float],
                     profile: BM3DProfile) -> np.ndarray:
     """

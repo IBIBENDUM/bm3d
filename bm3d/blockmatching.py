@@ -8,7 +8,7 @@ from .profile import BM3DProfile
 
 
 def findSimilarBlocksIndices(refBlock: np.ndarray, matchingBlocks: np.ndarray,
-                      profile: BM3DProfile) -> np.ndarray:
+                             profile: BM3DProfile) -> np.ndarray:
     """
     Find blocks in matchingBlocks similar to refBlock
 
@@ -21,10 +21,12 @@ def findSimilarBlocksIndices(refBlock: np.ndarray, matchingBlocks: np.ndarray,
         Indices of similar blocks sorted by increasing distance 
     """
     # Calculate distance between reference blocks and all other
-    distance: np.ndarray = np.sum((matchingBlocks - refBlock) ** 2, axis=(2, 3), dtype=np.int64)
+    distance: np.ndarray = np.sum((matchingBlocks - refBlock) ** 2,
+                                  axis=(2, 3), dtype=np.int64)
  
     # Get indices where distance below threshold
-    indices: np.ndarray = np.argwhere(distance < profile.distanceThreshold * profile.blockSize ** 2)
+    indices: np.ndarray = np.argwhere(distance < profile.distanceThreshold *
+                                      profile.blockSize ** 2)
 
     # Get distance values for sorting
     diffValues: np.ndarray = distance[indices[:, 0], indices[:, 1]]
@@ -78,4 +80,19 @@ def findSimilarGroups(image: np.ndarray, profile: BM3DProfile) -> Tuple[List[np.
 
     return similarBlocksCoords, similarGroups
 
-    
+
+def getGroupsFromCoords(image: np.ndarray, groupsCoords: List[np.ndarray],
+                        profile: BM3DProfile) -> List[np.ndarray]:
+
+    blocks: np.ndarray = np.lib.stride_tricks.sliding_window_view(
+        image, (profile.blockSize, profile.blockSize)
+    )[::profile.blockStep, ::profile.blockStep]
+
+    groups = []
+    for coords in groupsCoords:
+        indices = coords // profile.blockStep
+        group = blocks[indices[:, 0], indices[:, 1]]
+        groups.append(group)
+
+    return groups
+

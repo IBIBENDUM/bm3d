@@ -15,7 +15,7 @@ if __name__ == "__main__":
     transformedCoeffs1D = applyToGroups1DTransform(transformedGroups2D)
     # print(transformedCoeffs1D[0])
     #
-    filteredCoeffs1D = applyHTtoGroups(transformedCoeffs1D, profile)
+    filteredCoeffs1D = applyHtToGroups(transformedCoeffs1D, profile)
     # print(f"filteredCoeffs1D: {filteredCoeffs1D[0].shape}")
     #
     # weights = calculateBlocksWeights(filteredCoeffs1D, 10)
