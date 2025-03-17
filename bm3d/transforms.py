@@ -8,6 +8,15 @@ import numpy as np
 import pywt
 
 def applyToBlocks2dDct(blocks: np.ndarray) -> np.ndarray:
+    """
+    Apply 2D DCT to each block in blocks array
+
+    Args:
+        blocks: array of blocks
+    
+    Return:
+        Array of transformed blocks
+    """
     transformedBlocks = np.zeros_like(blocks, dtype=np.float32)
 
     for i in range(blocks.shape[0]): 
