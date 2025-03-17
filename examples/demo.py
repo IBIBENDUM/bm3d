@@ -30,11 +30,11 @@ def main(imagePath: str = "data/cameraman256.png", noiseVariance: int = 25) -> N
         profile = bm3d.BM3DProfile()
         denoisedImage, timeResult = bm3d.measureTime(bm3d.bm3d, noisyImage, noiseVariance, profile)
         cv2.imwrite("noisyImage.png", noisyImage)
-        cv2.imwrite("result.png", denoisedImage.astype(np.uint8))
-        print(f"Time spent: {timeResult}")
+        cv2.imwrite("result.png", denoisedImage)
+        print(f"Time spent: {timeResult:.2f}")
 
         psnr: float = bm3d.calculatePSNR(originalImage, denoisedImage)
-        print(f"PSNR: {psnr}")
+        print(f"PSNR: {psnr:.2f}")
 
     except Exception as e:
         logging.error(f"An error occurred during the process: {e}")
