@@ -1,44 +1,79 @@
+"""
+Functions for finding groups of similar blocks in image
+"""
+
 import numpy as np
-from typing import Tuple
+from typing import Tuple, List
 from .profile import BM3DProfile
 
-def findSimilarBlocksCoords(refBlock: np.ndarray, matchingBlocks: np.ndarray,
+
+def findSimilarBlocksIndices(refBlock: np.ndarray, matchingBlocks: np.ndarray,
                       profile: BM3DProfile) -> np.ndarray:
-    diff = np.sum((matchingBlocks - refBlock) ** 2, axis=(2, 3), dtype=np.int64)
+    """
+    Find blocks in matchingBlocks similar to refBlock
+
+    Args: 
+        refBlock: Reference block
+        matchingBlocks: Array of all possible blocks to search in
+        profile: BM3D parameters
+
+    Return:
+        Indices of similar blocks sorted by increasing distance 
+    """
+    # Calculate distance between reference blocks and all other
+    distance: np.ndarray = np.sum((matchingBlocks - refBlock) ** 2, axis=(2, 3), dtype=np.int64)
  
-    coords = np.argwhere(diff < profile.distanceThreshold * profile.blockSize ** 2)
+    # Get indices where distance below threshold
+    indices: np.ndarray = np.argwhere(distance < profile.distanceThreshold * profile.blockSize ** 2)
 
-    diff_values = diff[coords[:, 0], coords[:, 1]]
+    # Get distance values for sorting
+    diffValues: np.ndarray = distance[indices[:, 0], indices[:, 1]]
 
-    sorted_indices = np.argsort(diff_values)
+    # Sort indices by distance increasing
+    sortedIndices: np.ndarray = np.argsort(diffValues)
 
-    return coords[sorted_indices]
+    return indices[sortedIndices]
 
-def findSimilarGroups(image: np.ndarray, profile: BM3DProfile) -> Tuple:
 
+def findSimilarGroups(image: np.ndarray, profile: BM3DProfile) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+    """
+    Find groups of similar block in image
+
+    Args:
+        image: Input image
+        profile: BM3D properties
+    
+    Return:
+        List of coordinate arrays for each group
+        List of block arrays for each group
+    """
     # Get all possible blocks
     blocks: np.ndarray = np.lib.stride_tricks.sliding_window_view(
         image, (profile.blockSize, profile.blockSize)
     )[::profile.blockStep, ::profile.blockStep]
     
-    similarBlocksCoords = []
-    similarGroups = []
+    similarBlocksCoords: List[np.ndarray] = []
+    similarGroups: List[np.ndarray] = []
 
     for y in range(blocks.shape[0]):
         for x in range(blocks.shape[1]):
             refBlock = blocks[y, x] 
-            coords = findSimilarBlocksCoords(refBlock, blocks, profile)
+            indicies = findSimilarBlocksIndices(refBlock, blocks, profile)
 
-            if coords.shape[0] % 2 != 0:
-                coords = coords[:-1]
+            # Ensure even number of blocks
+            if indicies.shape[0] % 2 != 0:
+                indicies = indicies[:-1]
 
+            # Limit group size if specified
             if profile.groupMaxSize != 0:
-                if coords.shape[0] > profile.groupMaxSize:
-                   coords = coords[:profile.groupMaxSize]
+                if indicies.shape[0] > profile.groupMaxSize:
+                   indicies = indicies[:profile.groupMaxSize]
 
-            similarBlocksCoords.append(coords * profile.blockStep)
+            # Scale indices to get coordinates
+            similarBlocksCoords.append(indicies * profile.blockStep)
 
-            group = blocks[coords[:, 0], coords[:, 1]]
+            # Extract group of similar blocks
+            group = blocks[indicies[:, 0], indicies[:, 1]]
             similarGroups.append(group)
 
     return similarBlocksCoords, similarGroups

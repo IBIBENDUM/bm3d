@@ -21,6 +21,7 @@ def bm3d(noisyImage: np.ndarray, noiseVariance: float,
 
     return basicImage
 
+
 def _bm3dBasic(noisyImage: np.ndarray, noiseVariance: float,
                profile: BM3DProfile) -> np.ndarray:
     """

@@ -3,8 +3,11 @@ import numpy as np
 def addNoise(image: np.ndarray, noiseVariance: float) -> np.ndarray:
     """
     Add Additive Zero Mean White Gaussian Noise (AWGN) to image
-    :param image: image for noise applying
-    :param noise_variance: noise variance (sigma)
+    Args:
+        image: image for noise applying
+        noiseVariance: noise variance (sigma)
+    Return:
+        Image with noise
     """
     gaussianNoise = np.random.normal(0, noiseVariance, image.shape)
     gaussianNoise = gaussianNoise.reshape(image.shape)

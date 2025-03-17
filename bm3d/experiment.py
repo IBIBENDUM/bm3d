@@ -1,3 +1,7 @@
+"""
+Helper functions for experiments
+"""
+
 import time
 from typing import Callable, Any, Tuple
 
