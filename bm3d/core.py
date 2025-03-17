@@ -6,7 +6,7 @@ The algorithm consists of two stages: basic and final.
 from typing import List
 import numpy as np
 
-from .profile import BM3DProfile
+from .profile import BM3DProfile, BM3DStages
 from .blockmatching import findSimilarGroups, getGroupsFromCoords
 from .filtration import applyFilterHt, applyFilterWie
 from .agregation import agregation
@@ -18,11 +18,13 @@ def bm3d(noisyImage: np.ndarray, noiseVariance: float,
     Apply BM3D method to denoise image
     """
 
-    basicEstimate: np.ndarray = bm3dBasic(noisyImage, noiseVariance, profile)
-    # finalEstimate: np.ndarray = bm3dFinal(noisyImage, basicEstimate,
-    #                                       noiseVariance, profile)
+    estimate: np.ndarray = bm3dBasic(noisyImage, noiseVariance, profile)
 
-    return basicEstimate
+    if profile.stages == BM3DStages.BOTH_STAGES:
+        estimate = bm3dFinal(noisyImage, estimate,
+                             noiseVariance, profile)
+
+    return estimate
 
 
 def bm3dBasic(noisyImage: np.ndarray, noiseVariance: float,

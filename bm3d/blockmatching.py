@@ -36,6 +36,32 @@ def findSimilarBlocksIndices(refBlock: np.ndarray, matchingBlocks: np.ndarray,
 
     return indices[sortedIndices]
 
+def getSearchWindow(xRef: int, yRef: int, blocks: np.ndarray,
+                    profile: BM3DProfile) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Get window to search for similar blocks
+
+    Args:
+        xRef: Reference block x coordinate
+        yRef: Reference block y coordinate
+        blocks: Array of all possible blocks
+        profile: BM3D properties
+    
+    Return:
+        View of blocks limited by search window 
+        Array of matching window coordinates
+    """
+
+    if profile.searchWindow == 0:
+        return blocks, np.array([0, 0])
+
+    startY = max(0, yRef - profile.searchWindow)
+    endY = min(blocks.shape[0], yRef + profile.searchWindow + 1)
+    startX = max(0, xRef - profile.searchWindow)
+    endX = min(blocks.shape[1], xRef + profile.searchWindow + 1)
+
+    return blocks[startY:endY, startX:endX], np.array([startY, startX])
+
 
 def findSimilarGroups(image: np.ndarray, profile: BM3DProfile) -> Tuple[List[np.ndarray], List[np.ndarray]]:
     """
@@ -60,7 +86,8 @@ def findSimilarGroups(image: np.ndarray, profile: BM3DProfile) -> Tuple[List[np.
     for y in range(blocks.shape[0]):
         for x in range(blocks.shape[1]):
             refBlock = blocks[y, x] 
-            indicies = findSimilarBlocksIndices(refBlock, blocks, profile)
+            searchWindow, searchWindowCoords = getSearchWindow(x, y, blocks, profile)
+            indicies = findSimilarBlocksIndices(refBlock, searchWindow, profile)
 
             # Ensure even number of blocks
             if indicies.shape[0] % 2 != 0:
@@ -72,10 +99,10 @@ def findSimilarGroups(image: np.ndarray, profile: BM3DProfile) -> Tuple[List[np.
                    indicies = indicies[:profile.groupMaxSize]
 
             # Scale indices to get coordinates
-            similarBlocksCoords.append(indicies * profile.blockStep)
+            similarBlocksCoords.append((indicies + searchWindowCoords) * profile.blockStep)
 
             # Extract group of similar blocks
-            group = blocks[indicies[:, 0], indicies[:, 1]]
+            group = searchWindow[indicies[:, 0], indicies[:, 1]]
             similarGroups.append(group)
 
     return similarBlocksCoords, similarGroups
