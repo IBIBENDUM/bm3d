@@ -49,7 +49,7 @@ class BM3DProfile:
     def __init__(
         self,
         blockSize: int = 16,
-        blockStep: int = 16,
+        blockStep: int = 8,
         distanceThreshold: int = 100,
         filterThreshold: float = 10.00,
         groupMaxSize: int = 16,

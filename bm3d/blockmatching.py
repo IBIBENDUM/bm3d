@@ -32,9 +32,9 @@ def findSimilarGroups(image: np.ndarray, profile: BM3DProfile) -> Tuple:
             if coords.shape[0] % 2 != 0:
                 coords = coords[:-1]
 
-            # if profile.groupMaxSize != 0:
-            #     if coords.shape[0] > profile.groupMaxSize:
-            #        coords = coords[:profile.groupMaxSize]
+            if profile.groupMaxSize != 0:
+                if coords.shape[0] > profile.groupMaxSize:
+                   coords = coords[:profile.groupMaxSize]
 
             similarBlocksCoords.append(coords * profile.blockStep)
 
