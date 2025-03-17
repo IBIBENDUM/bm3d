@@ -18,10 +18,13 @@ def findSimilarGroups(image: np.ndarray, profile: BM3DProfile) -> Tuple:
     similarBlocksCoords = []
     similarGroups = []
 
-    for y in range(0, blocks.shape[0], 16):
-        for x in range(0, blocks.shape[1], 16):
+    for y in range(25):
+        for x in range(25):
             refBlock = blocks[y, x] 
             coords = findSimilarBlocksCoords(refBlock, blocks, profile)
+
+            if coords.shape[0] % 2 != 0:
+                coords = coords[:-1]
 
             if coords.shape[0] > profile.groupMaxSize:
                coords = coords[:profile.groupMaxSize]
