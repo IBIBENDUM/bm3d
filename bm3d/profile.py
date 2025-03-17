@@ -51,7 +51,7 @@ class BM3DProfile:
         blockSize: int = 16,
         blockStep: int = 8,
         distanceThreshold: int = 100,
-        filterThreshold: float = 30.00,
+        filterThreshold: float = 3.00,
         groupMaxSize: int = 16,
     ):
         self._blockSize = blockSize

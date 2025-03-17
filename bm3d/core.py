@@ -19,10 +19,10 @@ def bm3d(noisyImage: np.ndarray, noiseVariance: float,
     """
 
     basicEstimate: np.ndarray = bm3dBasic(noisyImage, noiseVariance, profile)
-    finalEstimate: np.ndarray = bm3dFinal(noisyImage, basicEstimate,
-                                          noiseVariance, profile)
+    # finalEstimate: np.ndarray = bm3dFinal(noisyImage, basicEstimate,
+    #                                       noiseVariance, profile)
 
-    return finalEstimate
+    return basicEstimate
 
 
 def bm3dBasic(noisyImage: np.ndarray, noiseVariance: float,
@@ -30,13 +30,16 @@ def bm3dBasic(noisyImage: np.ndarray, noiseVariance: float,
     """
     Perform basic step of the BM3D with hard-threshold filter
     """
+
     groupsCoords, groups = findSimilarGroups(noisyImage, profile)
 
     filteredGroups, weights = applyFilterHt(groups, noiseVariance, profile)
 
     imageEstimate = agregation(noisyImage.shape, filteredGroups,
                                groupsCoords, weights, profile)
-    return imageEstimate
+    clippedEstimate = np.clip(imageEstimate, 0, 255).astype(np.uint8)
+
+    return clippedEstimate
 
 
 def bm3dFinal(basicEstimate: np.ndarray, noisyImage: np.ndarray,
@@ -44,6 +47,7 @@ def bm3dFinal(basicEstimate: np.ndarray, noisyImage: np.ndarray,
     """
     Perform final step of the BM3D with wiener filter
     """
+
     groupsCoords, groupsEstimate = findSimilarGroups(basicEstimate, profile)
     groupsImage: List[np.ndarray] = getGroupsFromCoords(noisyImage, groupsCoords,
                                                         profile)
@@ -53,6 +57,9 @@ def bm3dFinal(basicEstimate: np.ndarray, noisyImage: np.ndarray,
 
     imageEstimate = agregation(noisyImage.shape, filteredGroups,
                                groupsCoords, weights, profile)
-    return imageEstimate
+
+    clippedEstimate = np.clip(imageEstimate, 0, 255).astype(np.uint8)
+
+    return clippedEstimate
 
 
