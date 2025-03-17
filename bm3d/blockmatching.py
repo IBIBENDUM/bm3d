@@ -2,9 +2,12 @@
 Functions for finding groups of similar blocks in image
 """
 
+import os
+import time
 import numpy as np
 from typing import Tuple, List
 from .profile import BM3DProfile
+from multiprocessing import Pool, cpu_count
 
 
 def findSimilarBlocksIndices(refBlock: np.ndarray, matchingBlocks: np.ndarray,
@@ -63,6 +66,39 @@ def getSearchWindow(xRef: int, yRef: int, blocks: np.ndarray,
     return blocks[startY:endY, startX:endX], np.array([startY, startX])
 
 
+def processBlock(args: Tuple[int, int, np.ndarray, BM3DProfile]) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Process a single block to find similar blocks.
+
+    Args:
+        args: Tuple containing (y, x, blocks, profile)
+
+    Return:
+        Tuple of (similarBlocksCoords, group)
+    """
+    y, x, blocks, profile = args
+    refBlock = blocks[y, x]
+    searchWindow, searchWindowCoords = getSearchWindow(x, y, blocks, profile)
+    indices = findSimilarBlocksIndices(refBlock, searchWindow, profile)
+
+    # Ensure even number of blocks
+    if indices.shape[0] % 2 != 0:
+        indices = indices[:-1]
+
+    # Limit group size if specified
+    if profile.groupMaxSize != 0:
+        if indices.shape[0] > profile.groupMaxSize:
+            indices = indices[:profile.groupMaxSize]
+
+    # Scale indices to get coordinates
+    similarBlocksCoords = (indices + searchWindowCoords) * profile.blockStep
+
+    # Extract group of similar blocks
+    group = searchWindow[indices[:, 0], indices[:, 1]]
+
+    return similarBlocksCoords, group
+
+
 def findSimilarGroups(image: np.ndarray, profile: BM3DProfile) -> Tuple[List[np.ndarray], List[np.ndarray]]:
     """
     Find groups of similar block in image
@@ -75,36 +111,32 @@ def findSimilarGroups(image: np.ndarray, profile: BM3DProfile) -> Tuple[List[np.
         List of coordinate arrays for each group
         List of block arrays for each group
     """
+
+    # TODO: Move to better place
+    # Reset task affinity so that all cores are used
+    os.system("taskset -p 0xff %d > /dev/null 2>&1" % os.getpid())
+
     # TODO: Add check for last block
     # Get all possible blocks
     blocks: np.ndarray = np.lib.stride_tricks.sliding_window_view(
         image, (profile.blockSize, profile.blockSize)
-    )[::profile.blockStep, ::profile.blockStep]
-    
+    )[:: profile.blockStep, :: profile.blockStep]
+
+    args = [
+        (y, x, blocks, profile)
+        for y in range(blocks.shape[0])
+        for x in range(blocks.shape[1])
+    ]
+
+    with Pool(processes=cpu_count()) as p:
+        results = p.map(processBlock, args)
+
     similarBlocksCoords: List[np.ndarray] = []
     similarGroups: List[np.ndarray] = []
 
-    for y in range(blocks.shape[0]):
-        for x in range(blocks.shape[1]):
-            refBlock = blocks[y, x] 
-            searchWindow, searchWindowCoords = getSearchWindow(x, y, blocks, profile)
-            indicies = findSimilarBlocksIndices(refBlock, searchWindow, profile)
-
-            # Ensure even number of blocks
-            if indicies.shape[0] % 2 != 0:
-                indicies = indicies[:-1]
-
-            # Limit group size if specified
-            if profile.groupMaxSize != 0:
-                if indicies.shape[0] > profile.groupMaxSize:
-                   indicies = indicies[:profile.groupMaxSize]
-
-            # Scale indices to get coordinates
-            similarBlocksCoords.append((indicies + searchWindowCoords) * profile.blockStep)
-
-            # Extract group of similar blocks
-            group = searchWindow[indicies[:, 0], indicies[:, 1]]
-            similarGroups.append(group)
+    for coords, group in results:
+        similarBlocksCoords.append(coords)
+        similarGroups.append(group)
 
     return similarBlocksCoords, similarGroups
 
