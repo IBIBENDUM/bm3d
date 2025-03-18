@@ -2,8 +2,6 @@
 Functions for finding groups of similar blocks in image
 """
 
-import os
-import time
 import numpy as np
 from typing import Tuple, List
 from .profile import BM3DProfile
@@ -23,10 +21,11 @@ def findSimilarBlocksIndices(refBlock: np.ndarray, matchingBlocks: np.ndarray,
     Return:
         Indices of similar blocks sorted by increasing distance 
     """
+
     # Calculate distance between reference blocks and all other
     distance: np.ndarray = np.sum((matchingBlocks - refBlock) ** 2,
                                   axis=(2, 3), dtype=np.int64)
- 
+
     # Get indices where distance below threshold
     indices: np.ndarray = np.argwhere(distance < profile.distanceThreshold *
                                       profile.blockSize ** 2)
@@ -42,7 +41,7 @@ def findSimilarBlocksIndices(refBlock: np.ndarray, matchingBlocks: np.ndarray,
 def getSearchWindow(xRef: int, yRef: int, blocks: np.ndarray,
                     profile: BM3DProfile) -> tuple[np.ndarray, np.ndarray]:
     """
-    Get window to search for similar blocks
+    Get blocks in search window
 
     Args:
         xRef: Reference block x coordinate
@@ -80,7 +79,7 @@ def processBlock(args: Tuple[int, int, np.ndarray, BM3DProfile]) -> Tuple[np.nda
     refBlock = blocks[y, x]
     searchWindow, searchWindowCoords = getSearchWindow(x, y, blocks, profile)
     indices = findSimilarBlocksIndices(refBlock, searchWindow, profile)
-
+               
     # Ensure even number of blocks
     if indices.shape[0] % 2 != 0:
         indices = indices[:-1]
