@@ -2,6 +2,7 @@
     Contains bm3d properties and predefined profiles
 """
 
+import os
 import enum
 
 
@@ -26,6 +27,7 @@ class BM3DStages(enum.Enum):
 
 
 # TODO: Add profiles fast and normal
+# TODO: FIX COPY PASTE
 class BM3DProfile:
     __slots__ = (
         "_blockSize",
@@ -36,6 +38,7 @@ class BM3DProfile:
         "_groupMaxSize",
         "_kaiserShape",
         "_stages",
+        "_cores"
     )
 
     blockSize = PositiveIntDescriptor("blockSize")
@@ -68,6 +71,20 @@ class BM3DProfile:
     def stages(self, value: BM3DStages):
         self._stages = value
 
+    @property
+    def cores(self) -> int:
+        return self._cores
+
+    @cores.setter
+    def cores(self, value: int):
+        if value == 0:
+            value = 1
+        elif value < 1:
+            cpuCount = os.cpu_count()
+            value = cpuCount + value + 1 if cpuCount else 1
+
+        self._cores = value
+
     def __init__(
         self,
         blockSize: int = 16,
@@ -78,6 +95,7 @@ class BM3DProfile:
         filterThreshold: float = 3.0,
         kaiserShape: float = 2.0,
         stages: BM3DStages = BM3DStages.BOTH_STAGES,
+        cores: int = 1,
     ):
         self._blockSize = blockSize
         self._blockStep = blockStep
@@ -87,6 +105,7 @@ class BM3DProfile:
         self._filterThreshold = filterThreshold
         self._kaiserShape = kaiserShape
         self._stages = stages
+        self.cores = cores
 
 
     def __repr__(self):
@@ -99,4 +118,5 @@ class BM3DProfile:
             f"filterThreshold={self._filterThreshold}, "
             f"kaiserShape={self._kaiserShape}, "
             f"stages={self._stages})"
+            f"cores={self._cores})"
         )

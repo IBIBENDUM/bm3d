@@ -117,7 +117,7 @@ def applyFilterHt(blocks: np.ndarray, groups: List[np.ndarray], groupsCoords: Li
         for group, groupCoords in zip(groups, groupsCoords)
     ]
 
-    with Pool(processes=cpu_count()) as p:
+    with Pool(processes=profile.cores) as p:
         results = p.starmap(filterGroupHt, args)
 
     filteredGroups = []
