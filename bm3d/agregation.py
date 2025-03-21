@@ -10,7 +10,6 @@ import numpy as np
 from .profile import BM3DProfile
 
 
-# TODO: Make for any shape
 def getKaiserWindow(size: int, beta: float=2) -> np.ndarray:
     """
     Create 2D Kaiser Window

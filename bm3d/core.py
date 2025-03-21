@@ -3,17 +3,17 @@ Implementation of BM3D method for removing noise from images.
 The algorithm consists of two stages: basic and final.
 """
 
-from typing import List
+from typing import List, Tuple
 import numpy as np
 import os
 
 from .profile import BM3DProfile, BM3DStages
-from .blockmatching import findSimilarGroups, getGroupsFromCoords
+from .blockmatching import findSimilarGroups, getGroupsFromCoords, getBlocks
 from .filtration import applyFilterHt, applyFilterWie
 from .agregation import globalAgregation
 
 
-def unlockAllCores():
+def unlockAllCores(coresNumber: int=1):
     coresNumber = os.cpu_count() or 1
     os.sched_getaffinity(coresNumber)
 
@@ -25,7 +25,8 @@ def bm3d(noisyImage: np.ndarray, noiseVariance: float,
     """
 
     # Reset task affinity so that all cores are used
-    # unlockAllCores()
+    if profile.cores != 1:
+        unlockAllCores(profile.cores)
 
     estimate: np.ndarray = bm3dBasic(noisyImage, noiseVariance, profile)
 
@@ -42,11 +43,12 @@ def bm3dBasic(noisyImage: np.ndarray, noiseVariance: float,
     Perform basic step of the BM3D with hard-threshold filter
     """
 
-    blocks: np.ndarray = np.lib.stride_tricks.sliding_window_view(
-        noisyImage, (profile.blockSize, profile.blockSize)
-        )[:: profile.blockStep, :: profile.blockStep]
+    blocks, blocksCoords = getBlocks(noisyImage, profile)
+    # blocks: np.ndarray = np.lib.stride_tricks.sliding_window_view(
+    #     noisyImage, (profile.blockSize, profile.blockSize)
+    #     )[:: profile.blockStep, :: profile.blockStep]
 
-    groupsCoords, groups = findSimilarGroups(blocks, profile)
+    groupsCoords, groups = findSimilarGroups(blocks, blocksCoords, profile)
 
     filteredGroups, weights = applyFilterHt(blocks, groups, groupsCoords, noiseVariance, profile)
 

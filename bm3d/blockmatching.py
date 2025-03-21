@@ -65,7 +65,9 @@ def getSearchWindow(xRef: int, yRef: int, blocks: np.ndarray,
     return blocks[startY:endY, startX:endX], np.array([startY, startX])
 
 
-def processBlock(args: Tuple[int, int, np.ndarray, BM3DProfile]) -> Tuple[np.ndarray, np.ndarray]:
+def processBlock(
+        args: Tuple[int, int, np.ndarray, np.ndarray, BM3DProfile]
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Process a single block to find similar blocks.
 
@@ -75,7 +77,7 @@ def processBlock(args: Tuple[int, int, np.ndarray, BM3DProfile]) -> Tuple[np.nda
     Return:
         Tuple of (similarBlocksCoords, group)
     """
-    y, x, blocks, profile = args
+    y, x, blocks, blocksCoords, profile = args
     refBlock = blocks[y, x]
     searchWindow, searchWindowCoords = getSearchWindow(x, y, blocks, profile)
     indices = findSimilarBlocksIndices(refBlock, searchWindow, profile)
@@ -90,7 +92,9 @@ def processBlock(args: Tuple[int, int, np.ndarray, BM3DProfile]) -> Tuple[np.nda
             indices = indices[:profile.groupMaxSize]
 
     # Scale indices to get coordinates
-    similarBlocksCoords = (indices + searchWindowCoords) * profile.blockStep
+    similarBlocksCoords = blocksCoords[(indices + searchWindowCoords)[:, 0],
+                                       (indices + searchWindowCoords)[:, 1]]
+    
 
     # Extract group of similar blocks
     group = searchWindow[indices[:, 0], indices[:, 1]]
@@ -98,7 +102,11 @@ def processBlock(args: Tuple[int, int, np.ndarray, BM3DProfile]) -> Tuple[np.nda
     return similarBlocksCoords, group
 
 
-def findSimilarGroups(blocks: np.ndarray, profile: BM3DProfile) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+def findSimilarGroups(
+    blocks: np.ndarray,
+    blocksCoords: np.ndarray,
+    profile: BM3DProfile
+) -> Tuple[List[np.ndarray], List[np.ndarray]]:
     """
     Find groups of similar block in image
 
@@ -111,20 +119,13 @@ def findSimilarGroups(blocks: np.ndarray, profile: BM3DProfile) -> Tuple[List[np
         List of block arrays for each group
     """
 
-
-    # TODO: Add check for last block
-    # Get all possible blocks
-    # blocks: np.ndarray = np.lib.stride_tricks.sliding_window_view(
-    #     image, (profile.blockSize, profile.blockSize)
-    # )[:: profile.blockStep, :: profile.blockStep]
-
     args = [
-        (y, x, blocks, profile)
+        (y, x, blocks, blocksCoords, profile)
         for y in range(blocks.shape[0])
         for x in range(blocks.shape[1])
     ]
 
-    with Pool(processes=cpu_count()) as p:
+    with Pool(processes=profile.cores) as p:
         results = p.map(processBlock, args)
 
     similarBlocksCoords: List[np.ndarray] = []
@@ -137,8 +138,22 @@ def findSimilarGroups(blocks: np.ndarray, profile: BM3DProfile) -> Tuple[List[np
     return similarBlocksCoords, similarGroups
 
 
-def getGroupsFromCoords(blocks: np.ndarray, groupsCoords: List[np.ndarray],
-                        profile: BM3DProfile) -> List[np.ndarray]:
+def getGroupsFromCoords(
+    blocks: np.ndarray, 
+    groupsCoords: List[np.ndarray], 
+    profile: BM3DProfile
+) -> List[np.ndarray]:
+    """
+    Retrieves groups of blocks from coordinates of similar blocks
+
+    Args:
+        blocks: Array of image blocks
+        groupsCoords: List of coordinate arrays
+        profile: BM3D properties
+
+    Return:
+        List of block arrays for each group
+    """
 
     groups = []
     for coords in groupsCoords:
@@ -148,3 +163,37 @@ def getGroupsFromCoords(blocks: np.ndarray, groupsCoords: List[np.ndarray],
 
     return groups
 
+def getBlocks(noisyImage: np.ndarray, profile: BM3DProfile) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Extract blocks based from image
+
+    Args:
+        noisyImage: Input image
+        profile: BM3D properties
+
+    Returns:
+        Tuple:
+            Array of image blocks (numY, numX, blockSize, blockSize)
+            Array of coordinates for each block (numY, numX, 2)
+    """
+    blockSize, blockStep = profile.blockSize, profile.blockStep
+    imageHeight, imageWidth = noisyImage.shape
+
+    def computeIndices(imageLength: int) -> list:
+        blocksAmount = (imageLength - blockSize) // blockStep + 1
+        if blocksAmount > 1:
+            indices = np.linspace(0, imageLength - blockSize, blocksAmount, dtype=int).tolist()
+        else:
+            indices = [0]
+        return indices
+
+    yIndices = computeIndices(imageHeight)
+    xIndices = computeIndices(imageWidth)
+
+    slidingBlocks = np.lib.stride_tricks.sliding_window_view(noisyImage, (blockSize, blockSize))
+    blocks = slidingBlocks[np.ix_(yIndices, xIndices)]
+    
+    yCoords, xCoords = np.meshgrid(yIndices, xIndices, indexing="ij")
+    coords = np.stack((yCoords, xCoords), axis=-1)
+    
+    return blocks, coords
