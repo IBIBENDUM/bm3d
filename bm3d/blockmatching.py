@@ -5,8 +5,7 @@ Functions for finding groups of similar blocks in image
 import numpy as np
 from typing import Tuple, List
 from .profile import BM3DProfile
-from multiprocessing import Pool, cpu_count
-
+from multiprocessing import Pool
 
 def findSimilarBlocksIndices(refBlock: np.ndarray, matchingBlocks: np.ndarray,
                              profile: BM3DProfile) -> np.ndarray:
