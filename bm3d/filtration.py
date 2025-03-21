@@ -10,17 +10,6 @@ from .blockmatching import getGroupsFromCoords
 from .transforms import *
 
 
-# def applyHtToGroups(groups: List[np.ndarray], noiseVariance: float, profile: BM3DProfile) -> List[np.ndarray]:
-#     """
-#     Apply hard-threshold filter to list of groups
-#     """
-#
-#     filteredCoeffs: List[np.ndarray] = []
-#     for group in groups:
-#         filteredCoeffs.append(applyHtToGroup(group, noiseVariance, profile))
-#
-#     return filteredCoeffs
-
 def applyWieToGroups(groupsEstimate: List[np.ndarray], groupsImage: List[np.ndarray],
                      noiseVariance: float) -> Tuple[List[np.ndarray], List[np.ndarray]]:
     """
@@ -79,9 +68,9 @@ def calculateGroupWeight(detailingCoeffs: np.ndarray,
 
     return groupWeight
 
-def filterGroupHt(transformedBlocks: np.ndarray, group: np.ndarray, groupsCoord: np.ndarray,
+def filterGroupHt(transformedBlocks: np.ndarray, group: np.ndarray, groupCoord: np.ndarray,
                   noiseVariance: float, profile: BM3DProfile) -> Tuple[np.ndarray, float]:
-    indices = groupsCoord // profile.blockStep
+    indices = groupCoord // profile.blockStep
     transformedGroup2D = transformedBlocks[indices[:, 0], indices[:, 1]]
 
     transformedGroup1D = applyToGroup1dTransform(transformedGroup2D)

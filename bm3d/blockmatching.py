@@ -27,16 +27,30 @@ def findSimilarBlocksIndices(refBlock: np.ndarray, matchingBlocks: np.ndarray,
                                   axis=(2, 3), dtype=np.int64)
 
     # Get indices where distance below threshold
-    indices: np.ndarray = np.argwhere(distance < profile.distanceThreshold *
-                                      profile.blockSize ** 2)
+    indices: np.ndarray = np.argwhere(
+        distance < profile.distanceThreshold * profile.blockSize ** 2
+    )
 
     # Get distance values for sorting
     diffValues: np.ndarray = distance[indices[:, 0], indices[:, 1]]
 
     # Sort indices by distance increasing
     sortedIndices: np.ndarray = np.argsort(diffValues)
+    indices = indices[sortedIndices]
 
-    return indices[sortedIndices]
+    # If only one block is found, add the next closest block
+    if indices.shape[0] == 1:
+        flat_distance = distance.flatten()
+        second_min_idx_flat = np.argpartition(flat_distance, 1)[1]
+        second_min_idx = np.array(
+            np.unravel_index(
+                second_min_idx_flat,
+                distance.shape
+            )
+        ).reshape(1, -1)
+        indices = np.concatenate([indices, second_min_idx], axis=0)
+    
+    return indices
 
 def getSearchWindow(xRef: int, yRef: int, blocks: np.ndarray,
                     profile: BM3DProfile) -> tuple[np.ndarray, np.ndarray]:
