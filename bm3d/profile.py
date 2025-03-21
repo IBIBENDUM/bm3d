@@ -87,3 +87,16 @@ class BM3DProfile:
         self._filterThreshold = filterThreshold
         self._kaiserShape = kaiserShape
         self._stages = stages
+
+
+    def __repr__(self):
+        return (
+            f"BM3DProfile(blockSize={self._blockSize}, "
+            f"blockStep={self._blockStep}, "
+            f"groupMaxSize={self._groupMaxSize}, "
+            f"searchWindow={self._searchWindow}, "
+            f"distanceThreshold={self._distanceThreshold}, "
+            f"filterThreshold={self._filterThreshold}, "
+            f"kaiserShape={self._kaiserShape}, "
+            f"stages={self._stages})"
+        )
