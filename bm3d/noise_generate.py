@@ -9,7 +9,6 @@ def addNoise(image: np.ndarray, noiseVariance: float) -> np.ndarray:
     Return:
         Image with noise
     """
-    np.random.seed(0)
     gaussianNoise = np.random.normal(0, noiseVariance, image.shape)
     gaussianNoise = gaussianNoise.reshape(image.shape)
     noisyImage = image + gaussianNoise
