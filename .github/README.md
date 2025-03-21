@@ -44,15 +44,15 @@ visualize the results
 
 - `train-test-split` - Selecting the optimal parameters
 
-### Roadmap 🗺️
+## Roadmap 🗺️
 
-#### Current Status ✅
+### Current Status ✅
 - [x] **Basic Two-Stage Implementation**
 - [x] **Optimizations from the Original Paper**
 - [x] **Multithreading Support**
 - [x] **Parameter Optimization on Train/Test Data**
 
-#### Future Goals 🚀
+### Future Goals 🚀
 - [ ] **Implement U-Net Model** 
 - [ ] **Optimize Key Functions in C++**
 - [ ] **Implement Numba**
