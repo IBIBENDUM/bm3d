@@ -8,7 +8,7 @@ setup(
         "numpy>=1.21.0",
         "opencv-python>=4.11.0.86",
         "PyWavelets>=1.8.0",
-        "typing>=3.10.0.0",
+        "typing>=3.5",
         "scipy>=1.15.2"
     ],
 )
