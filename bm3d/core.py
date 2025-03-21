@@ -25,7 +25,7 @@ def bm3d(noisyImage: np.ndarray, noiseVariance: float,
     """
 
     # Reset task affinity so that all cores are used
-    unlockAllCores()
+    # unlockAllCores()
 
     estimate: np.ndarray = bm3dBasic(noisyImage, noiseVariance, profile)
 
