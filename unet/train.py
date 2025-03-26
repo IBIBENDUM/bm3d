@@ -1,3 +1,6 @@
+from datetime import datetime
+import os
+import math
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -7,6 +10,21 @@ from model import UNet
 from config import config
 from dataloader import getDataLoader
 from plots import saveExamples, saveLosses
+
+def setupOutputDirectory():
+    """Create output directory with timestamp"""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    outputDir = os.path.join("results", f"run_{timestamp}")
+    os.makedirs(outputDir, exist_ok=True)
+    return outputDir
+
+def calculatePsnr(img1, img2, maxValue=1.0):
+    """Calculate PSNR between two images"""
+    mse = torch.mean((img1 - img2) ** 2)
+    if mse == 0:
+        return float('inf')
+    return 20 * math.log10(maxValue) - 10 * math.log10(mse.item())
+
 
 def runEpoch(model, dataLoader, criterion, optimizer, isTraining=True):
     """ Run one epoch of training or validation """
@@ -18,6 +36,10 @@ def runEpoch(model, dataLoader, criterion, optimizer, isTraining=True):
         desc = "Validating"
 
     epochLoss = 0
+    totalNoisyPsnr = 0
+    totalDenoisedPsnr = 0
+    numBatches = 0
+
     with torch.set_grad_enabled(isTraining):
         for noisy, clean in tqdm(dataLoader, desc=desc):
             noisy = noisy.to(config['device'])
@@ -30,41 +52,55 @@ def runEpoch(model, dataLoader, criterion, optimizer, isTraining=True):
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-            print(f"Pixel value from noisy image at (0, 0): {noisy[0, 0, 0, 0].item()}")
              
+            # Calculate PSNRs
+            batchNoisyPsnr = calculatePsnr(noisy, clean)
+            batchDenoisedPsnr = calculatePsnr(outputs, clean)
+            
+            totalNoisyPsnr += batchNoisyPsnr
+            totalDenoisedPsnr += batchDenoisedPsnr
+            numBatches += 1
+            
             epochLoss += loss.item() * noisy.size(0)
     
-    return epochLoss / len(dataLoader.dataset)
+    avgNoisyPsnr = totalNoisyPsnr / numBatches
+    avgDenoisedPsnr = totalDenoisedPsnr / numBatches
+    
+    return epochLoss / len(dataLoader.dataset), avgNoisyPsnr, avgDenoisedPsnr
 
-def psnrLoss(image1, image2, maxValue=1.0):
-    """ Calculate Peak Signal-to-Noise Ratio (PSNR) between two images """
-    mse = nn.functional.mse_loss(image1, image2)
-    psnr = 10 * torch.log10(maxValue**2 / mse)
-    return psnr
-
-def initModel():
+def initModel(outputDir):
     """ Initialize model, loss function, and optimizer """
     model = UNet().to(config['device'])
-    criterion = psnrLoss
+    criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=config['lr'])
+    config['model_save_path'] = os.path.join(outputDir, "denoising_model.pth")
     return model, criterion, optimizer
 
-def evaluateModel(model, dataLoader, epoch):
-    """ Evaluate the model on the validation set and saves example images """
+def evaluateModel(model, dataLoader, epoch, outputDir):
+    """Evaluate the model and save example images with PSNR metrics"""
     sampleNoisy, sampleClean = next(iter(dataLoader))
     sampleNoisy = sampleNoisy.to(config['device'])
+    sampleClean = sampleClean.to(config['device'])
     
     with torch.no_grad():
         sampleDenoised = model(sampleNoisy)
-        saveExamples(sampleNoisy, sampleDenoised, sampleClean, epoch)
+        
+        # Calculate PSNRs for the sample batch
+        noisyPsnr = calculatePsnr(sampleNoisy, sampleClean)
+        denoisedPsnr = calculatePsnr(sampleDenoised, sampleClean)
+        
+        print(f"Sample PSNR - Noisy: {noisyPsnr:.2f} dB | Denoised: {denoisedPsnr:.2f} dB")
+        saveExamples(sampleNoisy, sampleDenoised, sampleClean, epoch, outputDir)
 
 
 def trainModel():
     """ Training loop that trains model and saves results """
-    model, criterion, optimizer = initModel()
+    outputDir = setupOutputDirectory()
+    print(f"Saving results to: {outputDir}")
+
+    model, criterion, optimizer = initModel(outputDir)
 
     trainLoader = getDataLoader(
-        noisyDir=config["noisy_train_dir"],
         cleanDir=config["clean_train_dir"],
         batchSize=config["batch_size"],
         numWorkers=config["num_workers"],
@@ -72,7 +108,6 @@ def trainModel():
     )
 
     valLoader = getDataLoader(
-        noisyDir=config["noisy_val_dir"],
         cleanDir=config["clean_val_dir"],
         batchSize=config["batch_size"],
         numWorkers=config["num_workers"],
@@ -80,24 +115,37 @@ def trainModel():
     )
 
     trainLosses, valLosses = [], []
+    trainNoisyPsnrs, trainDenoisedPsnrs = [], []
+    valNoisyPsnrs, valDenoisedPsnrs = [], []
     
     for epoch in range(config['epochs']):
         print(f"\nEpoch {epoch+1}/{config['epochs']}")
         
         # Training phase
-        trainLoss = runEpoch(model, trainLoader, criterion, optimizer, isTraining=True)
+        trainLoss, trainNoisyPsnr, trainDenoisedPsnr = runEpoch(
+            model, trainLoader, criterion, optimizer, isTraining=True)
+        
         trainLosses.append(trainLoss)
+        trainNoisyPsnrs.append(trainNoisyPsnr)
+        trainDenoisedPsnrs.append(trainDenoisedPsnr)
         
         # Validation phase
-        valLoss = runEpoch(model, valLoader, criterion, None, isTraining=False)
+        valLoss, valNoisyPsnr, valDenoisedPsnr = runEpoch(
+            model, valLoader, criterion, None, isTraining=False)
+        
         valLosses.append(valLoss)
+        valNoisyPsnrs.append(valNoisyPsnr)
+        valDenoisedPsnrs.append(valDenoisedPsnr)
         
         print(f"Train Loss: {trainLoss:.4f} | Val Loss: {valLoss:.4f}")
-        evaluateModel(model, valLoader, epoch)
+        print(f"Train PSNR - Noisy: {trainNoisyPsnr:.2f} dB | Denoised: {trainDenoisedPsnr:.2f} dB")
+        print(f"Val PSNR - Noisy: {valNoisyPsnr:.2f} dB | Denoised: {valDenoisedPsnr:.2f} dB")
+        
+        evaluateModel(model, valLoader, epoch, outputDir)
     
     # Save results
     torch.save(model.state_dict(), config['model_save_path'])
-    saveLosses(trainLosses, valLosses)
+    saveLosses(trainLosses, valLosses, outputDir)
     return model
 
 if __name__ == "__main__":
