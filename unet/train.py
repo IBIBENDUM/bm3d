@@ -27,7 +27,7 @@ def setupOutputDirectory():
     outputDir = Path("results") / f"run_{timestamp}"
     outputDir.mkdir(parents=True, exist_ok=True)
 
-    return outputDir
+    return str(outputDir)
 
 
 def runEpoch(model, dataLoader, criterion, optimizer, isTraining, config):
