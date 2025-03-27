@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     model = loadModel("weights/weights1.pth", device)
 
-    noisyImagePath = "cameraman256.jpg"
+    noisyImagePath = "test_images/cameraman256.jpg"
     denoisedImage = denoiseImage(model, noisyImagePath, device)
     denoisedImage.save("denoised_image.png")
 
