@@ -3,13 +3,12 @@ from pathlib import Path
 import json
 import torch
 import torch.optim as optim
-import torch.nn as nn
-import torch.nn.functional as F
 from tqdm import tqdm
 
 from model import UNet, PSNRLoss, calculatePsnr
 from dataloader import getDataLoader
 from plots import saveExamples, saveLosses
+
 
 def loadConfig(configPath="config.json"):
     with open(configPath, "r") as file:
@@ -30,7 +29,7 @@ def setupOutputDirectory():
     return str(outputDir)
 
 
-def runEpoch(model, dataLoader, criterion, optimizer, isTraining, config):
+def runEpoch(model, dataLoader, criterion, optimizer, device, isTraining):
     """ Run one epoch of training or validation """
     if isTraining:
         model.train()
@@ -46,8 +45,8 @@ def runEpoch(model, dataLoader, criterion, optimizer, isTraining, config):
 
     with torch.set_grad_enabled(isTraining):
         for noisy, clean in tqdm(dataLoader, desc=desc):
-            noisy = noisy.to(config['device'])
-            clean = clean.to(config['device'])
+            noisy = noisy.to(device)
+            clean = clean.to(device)
             
             outputs = model(noisy)
             loss = criterion(outputs, clean)
@@ -82,11 +81,11 @@ def initModel(outputDir, config):
     return model, criterion, optimizer
 
 
-def evaluateModel(model, dataLoader, epoch, outputDir, config):
+def evaluateModel(model, dataLoader, epoch, outputDir, device):
     """ Evaluate the model and save example images with PSNR metrics """
     sampleNoisy, sampleClean = next(iter(dataLoader))
-    sampleNoisy = sampleNoisy.to(config['device'])
-    sampleClean = sampleClean.to(config['device'])
+    sampleNoisy = sampleNoisy.to(device)
+    sampleClean = sampleClean.to(device)
     
     with torch.no_grad():
         sampleDenoised = model(sampleNoisy)
@@ -98,9 +97,9 @@ def trainModel():
     outputDir = setupOutputDirectory()
     print(f"Saving results to: {outputDir}")
 
-
     config = loadConfig()
     model, criterion, optimizer = initModel(outputDir, config)
+    device = config["device"]
 
     trainLoader = getDataLoader(
         sourceDir=config["clean_train_dir"],
@@ -125,7 +124,7 @@ def trainModel():
         
         # Training phase
         trainLoss, trainNoisyPsnr, trainDenoisedPsnr = runEpoch(
-            model, trainLoader, criterion, optimizer, isTraining=True, config=config)
+            model, trainLoader, criterion, optimizer, device, isTraining=True)
         
         trainLosses.append(trainLoss)
         trainNoisyPsnrs.append(trainNoisyPsnr)
@@ -133,7 +132,7 @@ def trainModel():
         
         # Validation phase
         valLoss, valNoisyPsnr, valDenoisedPsnr = runEpoch(
-            model, valLoader, criterion, None, isTraining=False, config=config)
+            model, valLoader, criterion, None, device, isTraining=False)
         
         valLosses.append(valLoss)
         valNoisyPsnrs.append(valNoisyPsnr)
@@ -142,7 +141,7 @@ def trainModel():
         print(f"Train Loss: {trainLoss:.4f} | Val Loss: {valLoss:.4f}")
         print(f"Train PSNR - Noisy: {trainNoisyPsnr:.2f} dB | Denoised: {trainDenoisedPsnr:.2f} dB")
         
-        evaluateModel(model, valLoader, epoch, outputDir, config)
+        evaluateModel(model, valLoader, epoch, outputDir, device)
     
     # Save results
     torch.save(model.state_dict(), config['model_save_path'])
