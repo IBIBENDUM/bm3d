@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
-import os
+from pathlib import Path
 from datetime import datetime
 
 def saveExamples(noisy, denoised, clean, epoch, outputDir="epoch_outputs", numExamples=3):
-    os.makedirs(outputDir, exist_ok=True)
+    Path(outputDir).mkdir(parents=True, exist_ok=True)
     
     noisy = noisy[:numExamples].cpu().clamp(0, 1)
     denoised = denoised[:numExamples].cpu().clamp(0, 1)
@@ -34,7 +34,8 @@ def saveExamples(noisy, denoised, clean, epoch, outputDir="epoch_outputs", numEx
     plt.close()
 
 def saveLosses(trainLosses, valLosses, outputDir="epoch_outputs"):
-    os.makedirs(outputDir, exist_ok=True)
+    outputPath = Path(outputDir)
+    outputPath.mkdir(parents=True, exist_ok=True)
     
     plt.figure(figsize=(10, 5))
     plt.plot(trainLosses, label='Train Loss')
@@ -46,6 +47,6 @@ def saveLosses(trainLosses, valLosses, outputDir="epoch_outputs"):
     plt.grid()
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{outputDir}/losses_{timestamp}.png"
+    filename = outputPath / f"losses_{timestamp}.png"
     plt.savefig(filename)
     plt.close()

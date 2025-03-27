@@ -1,5 +1,5 @@
 from datetime import datetime
-import os
+from pathlib import Path 
 import json
 import torch
 import torch.optim as optim
@@ -24,8 +24,8 @@ def loadConfig(configPath="config.json"):
 def setupOutputDirectory():
     """ Create output directory with timestamp """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    outputDir = os.path.join("results", f"run_{timestamp}")
-    os.makedirs(outputDir, exist_ok=True)
+    outputDir = Path("results") / f"run_{timestamp}"
+    outputDir.mkdir(parents=True, exist_ok=True)
 
     return outputDir
 
@@ -78,7 +78,7 @@ def initModel(outputDir, config):
     model = UNet().to(config['device'])
     criterion = PSNRLoss()
     optimizer = optim.Adam(model.parameters(), lr=config['lr'])
-    config['model_save_path'] = os.path.join(outputDir, "denoising_model.pth")
+    config['model_save_path'] = outputDir / "denoising_model.pth"
     return model, criterion, optimizer
 
 

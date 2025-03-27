@@ -1,32 +1,32 @@
-import os
+from pathlib import Path
 import shutil
-from typing import Optional
 
-def moveImagesToRoot(download_dir: str = "original_dataset") -> None:
+def moveImagesToRoot(rootDir: str = "original_dataset") -> None:
     """Collect all images to root directory"""
-    for root, dirs, files in os.walk(download_dir):
-        for file in files:
-            if file.lower().endswith(('.jpg', '.png', '.jpeg')):
-                src_path = os.path.join(root, file)
-                dst_path = os.path.join(download_dir, file)
-                if os.path.exists(dst_path):
-                    base, ext = os.path.splitext(file)
-                    i = 1
-                    while os.path.exists(dst_path):
-                        dst_path = os.path.join(download_dir, f"{base}_{i}{ext}")
-                        i += 1
-                shutil.move(src_path, dst_path)
+    rootPath = Path(rootDir)
+    for path in rootPath.rglob("*"):
+        if path.is_file() and path.suffix.lower() in ['.jpg', '.png', '.jpeg']:
+            destPath = rootPath / path.name
+            if destPath.exists():
+                base = destPath.stem
+                ext = destPath.suffix
+                i = 1
+                while (rootPath / f"{base}_{i}{ext}").exists():
+                    i += 1
+                destPath = rootPath / f"{base}_{i}{ext}"
+            shutil.move(str(path), str(destPath))
 
-def removeSubdirs(download_dir: str = "original_dataset") -> None:
+def removeSubdirs(rootDir: str = "original_dataset") -> None:
     """Remove all subdirectories"""
-    for root, dirs, files in os.walk(download_dir, topdown=False):
-        for dir in dirs:
-            dir_path = os.path.join(root, dir)
-            if dir_path != download_dir:
-                shutil.rmtree(dir_path)
+    rootPath = Path(rootDir)
+    for dirPath in rootPath.glob("*"):
+        if dirPath.is_dir() and dirPath != rootPath:
+            shutil.rmtree(dirPath)
 
-def createEmptyDirectory(dir_path: str) -> None:
+def createEmptyDirectory(dir: str) -> None:
     """Create empty directory, removing existing if needed"""
-    if os.path.exists(dir_path):
-        shutil.rmtree(dir_path) 
-    os.makedirs(dir_path)
+    path = Path(dir)
+    if path.exists():
+        shutil.rmtree(path)
+    path.mkdir(parents=True)
+

@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 import cv2
 import imagesize
 from typing import Optional
@@ -15,11 +15,12 @@ def cropImage(image, cropSize = (128, 128)):
                  startX:startX + cropSize[0]]
 
 def getValidImagePaths(sourceDir, minSize=(512,512)):
+    sourcePath = Path(sourceDir)
     minSize = minSize or (0, 0)
     validImages = [
-        f for f in os.listdir(sourceDir)
-        if f.endswith(('.jpg', '.png', '.jpeg')) and
-           imagesize.get(os.path.join(sourceDir, f)) >= minSize
+        file.name for file in sourcePath.iterdir()
+        if file.suffix.lower() in ('.jpg', '.png', '.jpeg') and
+           imagesize.get(str(file)) >= minSize
     ]
 
     return validImages
@@ -32,11 +33,10 @@ def processAndSaveImage(srcPath, dstPath, cropSize=None):
 
 
 def splitDataset(sourceDir: str="original_dataset", 
-                   outputDir: str="split_dataset",
-                   testSize: float=0.2,
-                   maxImages: Optional[int]=None,
-                   minSize: Optional[tuple]=None,
-                   cropSize: Optional[tuple]=None):
+                 outputDir: str="split_dataset",
+                 testSize: float=0.2,
+                 maxImages: Optional[int]=None,
+                 cropSize: Optional[tuple]=None):
 
     imageFiles = getValidImagePaths(sourceDir, cropSize) 
     if maxImages is not None and len(imageFiles) > maxImages:
@@ -46,14 +46,16 @@ def splitDataset(sourceDir: str="original_dataset",
                                              test_size=testSize,
                                              random_state=0)
 
-    createEmptyDirectory(os.path.join(outputDir, 'train'))
-    createEmptyDirectory(os.path.join(outputDir, 'test'))
+    outputPath = Path(outputDir)
+    sourcePath = Path(sourceDir)
+    createEmptyDirectory(str(outputPath / 'train'))
+    createEmptyDirectory(str(outputPath / 'test'))
 
-    for data_type, files in [('train', trainFiles), ('test', testFiles)]:
-        output_dir = os.path.join(outputDir, data_type)
+    for dataType, files in [('train', trainFiles), ('test', testFiles)]:
+        outputPath = outputPath / dataType
         for file in files:
-            src = os.path.join(sourceDir, file)
-            dst = os.path.join(output_dir, file)
+            src = sourcePath / file
+            dst = outputPath / file
             processAndSaveImage(src, dst, cropSize)
 
     print(f"Dataset split completed: {len(trainFiles)} train, {len(testFiles)} test images")

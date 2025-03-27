@@ -2,13 +2,13 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 from PIL import Image
-import glob
-import os
+from pathlib import Path
 import random
 
 class ImageDataset(Dataset):
     def __init__(self, sourceDir, transform=None, mode="L"):
-        self.images = sorted(glob.glob(os.path.join(sourceDir, "*")))
+        self.sourcePath = Path(sourceDir)
+        self.images = sorted(self.sourcePath.glob("*"))
         self.mode = mode  # "L" or "RGB"
         self.baseTransform = transforms.Compose([transforms.ToTensor()])
         self.augmentTransform = transform if transform else None
