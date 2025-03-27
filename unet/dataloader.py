@@ -73,7 +73,7 @@ class ImageDataset(Dataset):
 
 
 def getDataLoader(
-    cleanDir,
+    sourceDir,
     batchSize=16,
     numWorkers=4,
     shuffle=True,
@@ -88,12 +88,11 @@ def getDataLoader(
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomVerticalFlip(),
                 transforms.RandomRotation(15),
-                transforms.ColorJitter(brightness=0.1, contrast=0.1),
-                transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+                transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9,1.1))
             ]
         )
 
-    dataset = ImageDataset(sourceDir=cleanDir, mode=mode, transform=augmentTransform)
+    dataset = ImageDataset(sourceDir=sourceDir, mode=mode, transform=augmentTransform)
 
     dataLoader = DataLoader(
         dataset,
