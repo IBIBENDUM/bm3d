@@ -59,11 +59,12 @@ def runEpoch(model, dataLoader, criterion, optimizer, device, isTraining):
                 optimizer.step()
              
             # Calculate PSNRs
-            # batchNoisyPsnr = piq.psnr(noisy, clean)
-            # batchDenoisedPsnr = piq.psnr(outputs, clean)
+            outputs = (outputs - outputs.min()) / (outputs.max() - outputs.min())
+            batchNoisyPsnr = piq.psnr(noisy, clean)
+            batchDenoisedPsnr = piq.psnr(outputs, clean)
             
-            # totalNoisyPsnr += batchNoisyPsnr
-            # totalDenoisedPsnr += batchDenoisedPsnr
+            totalNoisyPsnr += batchNoisyPsnr
+            totalDenoisedPsnr += batchDenoisedPsnr
             numBatches += 1
             
             epochLoss += loss.item() * noisy.size(0)
@@ -147,7 +148,7 @@ def trainModel():
     
     # Save results
     torch.save(model.state_dict(), config['model_save_path'])
-    saveLosses(trainLosses, valLosses, outputDir)
+    saveLosses(trainLosses, valLosses, str(outputDir))
     return model
 
 if __name__ == "__main__":
