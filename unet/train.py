@@ -2,10 +2,12 @@ from datetime import datetime
 from pathlib import Path 
 import json
 import torch
+import torch.nn as nn
 import torch.optim as optim
+import piq
 from tqdm import tqdm
 
-from model import UNet, PSNRLoss, calculatePsnr
+from model import UNet
 from dataloader import getDataLoader
 from plots import saveExamples, saveLosses
 
@@ -26,7 +28,7 @@ def setupOutputDirectory():
     outputDir = Path("results") / f"run_{timestamp}"
     outputDir.mkdir(parents=True, exist_ok=True)
 
-    return str(outputDir)
+    return outputDir
 
 
 def runEpoch(model, dataLoader, criterion, optimizer, device, isTraining):
@@ -57,11 +59,11 @@ def runEpoch(model, dataLoader, criterion, optimizer, device, isTraining):
                 optimizer.step()
              
             # Calculate PSNRs
-            batchNoisyPsnr = calculatePsnr(noisy, clean)
-            batchDenoisedPsnr = calculatePsnr(outputs, clean)
+            # batchNoisyPsnr = piq.psnr(noisy, clean)
+            # batchDenoisedPsnr = piq.psnr(outputs, clean)
             
-            totalNoisyPsnr += batchNoisyPsnr
-            totalDenoisedPsnr += batchDenoisedPsnr
+            # totalNoisyPsnr += batchNoisyPsnr
+            # totalDenoisedPsnr += batchDenoisedPsnr
             numBatches += 1
             
             epochLoss += loss.item() * noisy.size(0)
@@ -75,7 +77,7 @@ def runEpoch(model, dataLoader, criterion, optimizer, device, isTraining):
 def initModel(outputDir, config):
     """ Initialize model, loss function, and optimizer """
     model = UNet().to(config['device'])
-    criterion = PSNRLoss()
+    criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=config['lr'])
     config['model_save_path'] = outputDir / "denoising_model.pth"
     return model, criterion, optimizer

@@ -2,20 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-def calculatePsnr(img1, img2, max_val=1.0):
-    mse = F.mse_loss(img1, img2)
-    if mse == 0:
-        return float('inf')
-    return 10 * torch.log10(max_val ** 2 / mse)
-
-class PSNRLoss(nn.Module):
-    def __init__(self, max_val=1.0):
-        super(PSNRLoss, self).__init__()
-        self.max_val = max_val
-    
-    def forward(self, pred, target):
-        return -calculatePsnr(pred, target, self.max_val)
-
 class DoubleConv(nn.Module):
     def __init__(self, inChannels, outChannels):
         super().__init__()
@@ -43,9 +29,9 @@ class EncoderBlock(nn.Module):
     def __init__(self, inChannels, outChannels):
         super().__init__()
         self.encoder = nn.Sequential(
-            nn.MaxPool2d(2), DoubleConv(inChannels, outChannels)
+            nn.MaxPool2d(2),
+            DoubleConv(inChannels, outChannels)
         )
-
 
     def forward(self, inputTensor):
         return self.encoder(inputTensor)
@@ -70,7 +56,7 @@ class DecoderBlock(nn.Module):
 
         upSampled = F.pad(
             upSampled,
-            [
+           [
                 widthDiff // 2,
                 widthDiff - widthDiff // 2,
                 heightDiff // 2,
