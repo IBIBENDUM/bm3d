@@ -38,7 +38,7 @@ class EncoderBlock(nn.Module):
 
 
 class DecoderBlock(nn.Module):
-    def __init__(self, inChannels, outChannels):
+    def __init__(self, inChannels, outChannels, dynamicPadding=True):
         super().__init__()
         self.upSample = nn.ConvTranspose2d(
             in_channels=inChannels,
@@ -47,6 +47,7 @@ class DecoderBlock(nn.Module):
             stride=2,
         )
         self.conv = DoubleConv(inChannels, outChannels)
+        self.dynamicPadding = dynamicPadding
 
 
     def forward(self, inputTensor, skipConnection):
@@ -54,15 +55,16 @@ class DecoderBlock(nn.Module):
         heightDiff = skipConnection.size()[2] - upSampled.size()[2]
         widthDiff = skipConnection.size()[3] - upSampled.size()[3]
 
-        upSampled = F.pad(
-            upSampled,
-           [
-                widthDiff // 2,
-                widthDiff - widthDiff // 2,
-                heightDiff // 2,
-                heightDiff - heightDiff // 2,
-            ],
-        )
+        if self.dynamicPadding:
+            upSampled = F.pad(
+                upSampled,
+               [
+                    widthDiff // 2,
+                    widthDiff - widthDiff // 2,
+                    heightDiff // 2,
+                    heightDiff - heightDiff // 2,
+                ],
+            )
 
         merged = torch.cat([skipConnection, upSampled], dim=1)
 
@@ -71,10 +73,17 @@ class DecoderBlock(nn.Module):
 
 class UNet(nn.Module):
     def __init__(
-        self, inChannels=1, outChannels=1, featureSizes=[64, 128, 256, 512, 1024]
+        self,
+        inChannels=1,
+        outChannels=1,
+        featureSizes=[64, 128, 256, 512, 1024],
+        dynamicPadding=True,
     ):
         super().__init__()
         self.inputConv = DoubleConv(inChannels, featureSizes[0])
+
+        self.dynamicPadding = dynamicPadding
+        self.downsampleFactor = 2 ** (len(featureSizes) - 1)
 
         self.downBlocks = nn.ModuleList(
             [
@@ -85,15 +94,39 @@ class UNet(nn.Module):
 
         self.upBlocks = nn.ModuleList(
             [
-                DecoderBlock(featureSizes[i], featureSizes[i - 1])
+                DecoderBlock(featureSizes[i], featureSizes[i - 1], dynamicPadding)
                 for i in range(len(featureSizes) - 1, 0, -1)
             ]
         )
 
         self.finalConv = nn.Conv2d(featureSizes[0], outChannels, kernel_size=1)
 
+    def padImage(self, tensor):
+        _, _, h, w = tensor.size()
+        factor = self.downsampleFactor
+        hPad = (factor - h % factor) % factor
+        wPad = (factor - w % factor) % factor
+
+        self.inputPad = (
+            wPad // 2,
+            wPad - wPad // 2,
+            hPad // 2,
+            hPad - hPad // 2,
+        )
+
+        return F.pad(tensor, self.inputPad)
+
+    def unpadImage(self, tensor):
+        _, _, h, w = tensor.size()
+        wPadLeft, wPadRight, hPadtop, hPadBottom = self.inputPad
+        unpaddedTensor = tensor[:, :, hPadtop : h - hPadBottom, wPadLeft : w - wPadRight] 
+
+        return unpaddedTensor
 
     def forward(self, inputTensor):
+        if self.dynamicPadding is False:
+            inputTensor = self.padImage(inputTensor)
+
         skipConnections = []
         tensor = self.inputConv(inputTensor)
 
@@ -104,4 +137,9 @@ class UNet(nn.Module):
         for up, skip in zip(self.upBlocks, reversed(skipConnections)):
             tensor = up(tensor, skip)
 
-        return self.finalConv(tensor)
+        output = self.finalConv(tensor) 
+
+        if self.dynamicPadding is False:
+            output = self.padImage(output)
+
+        return output
