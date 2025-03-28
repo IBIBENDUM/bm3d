@@ -52,10 +52,10 @@ def splitDataset(sourceDir: str="original_dataset",
     createEmptyDirectory(str(outputPath / 'test'))
 
     for dataType, files in [('train', trainFiles), ('test', testFiles)]:
-        outputPath = outputPath / dataType
+        destPath = outputPath / dataType
         for file in files:
             src = sourcePath / file
-            dst = outputPath / file
+            dst = destPath / file
             processAndSaveImage(src, dst, cropSize)
 
     print(f"Dataset split completed: {len(trainFiles)} train, {len(testFiles)} test images")
