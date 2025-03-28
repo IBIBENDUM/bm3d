@@ -145,6 +145,6 @@ class UNet(nn.Module):
         output = self.finalConv(tensor) 
 
         if self.dynamicPadding is False:
-            output = self.padImage(output)
+            output = self.unpadImage(output)
 
         return output
