@@ -2,9 +2,17 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from datetime import datetime
 
+def setGraphStyle():
+    plt.style.use("latte")
+    plt.rcParams['figure.facecolor'] = 'white'
+    plt.rcParams['axes.facecolor'] = 'white'
+    plt.rcParams['savefig.facecolor'] = 'white'
+
 def saveExamples(noisy, denoised, clean, epoch, outputDir="epoch_outputs", numExamples=3):
     Path(outputDir).mkdir(parents=True, exist_ok=True)
-    
+
+    setGraphStyle()
+
     noisy = noisy[:numExamples].cpu().clamp(0, 1)
     denoised = denoised[:numExamples].cpu().clamp(0, 1)
     clean = clean[:numExamples].cpu().clamp(0, 1)
@@ -33,9 +41,11 @@ def saveExamples(noisy, denoised, clean, epoch, outputDir="epoch_outputs", numEx
     plt.savefig(filename)
     plt.close()
 
-def saveLosses(trainLosses, valLosses, outputDir="epoch_outputs"):
+def saveLosses(trainLosses, valLosses, outputDir="results"):
     outputPath = Path(outputDir)
     outputPath.mkdir(parents=True, exist_ok=True)
+
+    setGraphStyle()
     
     plt.figure(figsize=(10, 5))
     plt.plot(trainLosses, label='Train Loss')
