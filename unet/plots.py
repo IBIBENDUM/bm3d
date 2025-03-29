@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 from pathlib import Path
 from datetime import datetime
+import catppuccin
 
 def setGraphStyle():
     plt.style.use("latte")
