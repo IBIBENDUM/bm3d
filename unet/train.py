@@ -10,6 +10,7 @@ from tqdm import tqdm
 from model import UNet
 from dataloader import getDataLoader
 from plots import saveExamples, saveLosses
+from checkpoints import saveCheckpoint, loadCheckpoint
 
 
 def loadConfig(configPath="config.json"):
@@ -21,7 +22,6 @@ def loadConfig(configPath="config.json"):
 
     return config
 
-
 def setupOutputDirectory():
     """ Create output directory with timestamp """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -30,22 +30,23 @@ def setupOutputDirectory():
 
     return outputDir
 
-
 def runEpoch(model, dataLoader, criterion, optimizer, device, isTraining):
     """ Run one epoch of training or validation """
     if isTraining:
         model.train()
         desc = "Training"
+        mode = torch.set_grad_enabled(True)
     else:
         model.eval()
         desc = "Validating"
+        mode = torch.inference_mode()
 
     epochLoss = 0
     totalNoisyPsnr = 0
     totalDenoisedPsnr = 0
     numBatches = 0
 
-    with torch.set_grad_enabled(isTraining):
+    with mode:
         for noisy, clean in tqdm(dataLoader, desc=desc):
             noisy = noisy.to(device)
             clean = clean.to(device)
@@ -71,6 +72,7 @@ def runEpoch(model, dataLoader, criterion, optimizer, device, isTraining):
     
     avgNoisyPsnr = totalNoisyPsnr / numBatches
     avgDenoisedPsnr = totalDenoisedPsnr / numBatches
+    print(epochLoss / len(dataLoader.dataset))
     
     return epochLoss / len(dataLoader.dataset), avgNoisyPsnr, avgDenoisedPsnr
 
@@ -79,8 +81,9 @@ def initModel(outputDir, config):
     """ Initialize model, loss function, and optimizer """
     model = UNet().to(config['device'])
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=config['lr'])
-    config['model_save_path'] = outputDir / "denoising_model.pth"
+    optimizer = optim.Adam(model.parameters(), lr=config['learningRate'])
+    config['modelSavePath'] = outputDir / "denoising_model.pth"
+
     return model, criterion, optimizer
 
 
@@ -104,17 +107,24 @@ def trainModel():
     model, criterion, optimizer = initModel(outputDir, config)
     device = config["device"]
 
+    try:
+        model, optimizer, startEpoch, startLoss = loadCheckpoint(model, optimizer)
+        print(f"Resuming from epoch {startEpoch} with loss {startLoss:.4f}")
+    except FileNotFoundError:
+        startEpoch = 0
+        print("No checkpoint found. Starting from scratch.")
+
     trainLoader = getDataLoader(
-        sourceDir=config["clean_train_dir"],
-        batchSize=config["batch_size"],
-        numWorkers=config["num_workers"],
+        sourceDir=config["cleanTrainDir"],
+        batchSize=config["batchSize"],
+        numWorkers=config["numWorkers"],
         shuffle=True,
     )
 
     valLoader = getDataLoader(
-        sourceDir=config["clean_val_dir"],
-        batchSize=config["batch_size"],
-        numWorkers=config["num_workers"],
+        sourceDir=config["cleanValDir"],
+        batchSize=config["batchSize"],
+        numWorkers=config["numWorkers"],
         shuffle=False,
     )
 
@@ -122,7 +132,7 @@ def trainModel():
     trainNoisyPsnrs, trainDenoisedPsnrs = [], []
     valNoisyPsnrs, valDenoisedPsnrs = [], []
     
-    for epoch in range(config['epochs']):
+    for epoch in range(startEpoch, config['epochs']):
         print(f"\nEpoch {epoch+1}/{config['epochs']}")
         
         # Training phase
@@ -144,11 +154,15 @@ def trainModel():
         print(f"Train Loss: {trainLoss:.4f} | Val Loss: {valLoss:.4f}")
         print(f"Train PSNR - Noisy: {trainNoisyPsnr:.2f} dB | Denoised: {trainDenoisedPsnr:.2f} dB")
         
-        evaluateModel(model, valLoader, epoch, outputDir, device)
+        if (epoch + 1) % 10 == 0:
+            evaluateModel(model, valLoader, epoch, outputDir, device)
+            saveCheckpoint(model, optimizer, epoch, trainLoss)
+    
     
     # Save results
-    torch.save(model.state_dict(), config['model_save_path'])
+    torch.save(model.state_dict(), config['modelSavePath'])
     saveLosses(trainLosses, valLosses, str(outputDir))
+
     return model
 
 if __name__ == "__main__":
