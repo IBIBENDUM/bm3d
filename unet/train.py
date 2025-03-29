@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path 
 import json
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -9,6 +10,7 @@ from tqdm import tqdm
 
 from model import UNet
 from dataloader import getDataLoader
+from early_stopping import EarlyStopping
 from plots import saveExamples, saveLosses
 from checkpoints import saveCheckpoint, loadCheckpoint
 
@@ -131,6 +133,8 @@ def trainModel():
     trainLosses, valLosses = [], []
     trainNoisyPsnrs, trainDenoisedPsnrs = [], []
     valNoisyPsnrs, valDenoisedPsnrs = [], []
+
+    earlyStopping = EarlyStopping(patience=5, minDelta=0.01)
     
     for epoch in range(startEpoch, config['epochs']):
         print(f"\nEpoch {epoch+1}/{config['epochs']}")
@@ -157,7 +161,11 @@ def trainModel():
         if (epoch + 1) % 10 == 0:
             evaluateModel(model, valLoader, epoch, outputDir, device)
             saveCheckpoint(model, optimizer, epoch, trainLoss)
-    
+
+        earlyStopping(valLoss)
+        if earlyStopping.earlyStop:
+            print("Early stopping triggered!")
+            break
     
     # Save results
     torch.save(model.state_dict(), config['modelSavePath'])
