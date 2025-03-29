@@ -4,6 +4,7 @@ from torchvision import transforms
 from PIL import Image
 from pathlib import Path
 import random
+from skimage.util import random_noise
 
 class ImageDataset(Dataset):
     def __init__(self, sourceDir, transform=None, mode="L"):
@@ -35,38 +36,34 @@ class ImageDataset(Dataset):
         noiseType = random.choice(["gaussian", "salt_pepper", "poisson", "speckle"])
         noisyImg = image.clone()
 
-        if noiseType == "gaussian":
-            # Random std between 0.02 and 0.3
-            std = random.uniform(0.02, 0.3)
-            noise = torch.randn_like(image) * std
-            noisyImg = image + noise
+        # Apply noise in range from 15 to 35 PSNR
+        match noiseType:
+            case "gaussian":
+                # Random std between 50 and 5
+                noiseLevel = random.uniform(5, 50)
+                noiseTransform = transforms.GaussianNoise(
+                    mean=0.0, sigma=noiseLevel / 255, clip=True
+                )
+                noisyImg = noiseTransform(noisyImg)
 
-        elif noiseType == "salt_pepper":
-            # Random amount between 0.01 and 0.2
-            amount = random.uniform(0.01, 0.2)
-            # Random salt vs pepper ratio
-            s_vs_p = random.uniform(0.3, 0.7)
+            case "salt_pepper":
+                # Random amount between 0.1 and 0.001
+                noiseLevel = random.uniform(0.001, 0.1)
+                noisyImg = torch.tensor(
+                    random_noise(noisyImg.numpy(), mode="salt", amount=noiseLevel)
+                )
 
-            # Create salt and pepper noise
-            noisyImg = image.clone()
-            numSalt = int(amount * image.numel() * s_vs_p)
-            saltCoords = [torch.randint(0, i, (numSalt,)) for i in image.shape]
-            noisyImg[tuple(saltCoords)] = 1
+            case "poisson":
+                # Random lambda between 20 and 1500
+                noiseLevel = random.uniform(20, 1500)
+                noisyImg = torch.poisson(image * noiseLevel) / noiseLevel
 
-            numPepper = int(amount * image.numel() * (1.0 - s_vs_p))
-            pepperCoords = [torch.randint(0, i, (numPepper,)) for i in image.shape]
-            noisyImg[tuple(pepperCoords)] = 0
-
-        elif noiseType == "poisson":
-            # Random lambda between 5 and 30
-            lam = random.uniform(5, 30)
-            noisyImg = torch.poisson(image * lam) / lam
-
-        elif noiseType == "speckle":
-            # Random std between 0.05 and 0.3
-            std = random.uniform(0.05, 0.3)
-            noise = torch.randn_like(image) * std
-            noisyImg = image + image * noise
+            case "speckle":
+                # Random std between 0.05 and 0.3
+                noiseLevel = random.uniform(30, 0.2)
+                noisyImg = torch.tensor(
+                    random_noise(image.numpy(), mode="speckle", var=noiseLevel / 255)
+                )
 
         # Clip to valid range
         return torch.clamp(noisyImg, 0, 1)
@@ -88,7 +85,8 @@ def getDataLoader(
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomVerticalFlip(),
                 transforms.RandomRotation(90),
-                transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9,1.1))
+                transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9,1.1)),
+                transforms.RandomPerspective(distortion_scale=0.5)
             ]
         )
 
