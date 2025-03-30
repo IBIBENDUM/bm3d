@@ -134,7 +134,7 @@ def trainModel():
     trainNoisyPsnrs, trainDenoisedPsnrs = [], []
     valNoisyPsnrs, valDenoisedPsnrs = [], []
 
-    earlyStopping = EarlyStopping(patience=5, minDelta=0.01)
+    earlyStopping = EarlyStopping(patience=10, minDelta=0.005)
     
     for epoch in range(startEpoch, config['epochs']):
         print(f"\nEpoch {epoch+1}/{config['epochs']}")
@@ -158,7 +158,7 @@ def trainModel():
         print(f"Train Loss: {trainLoss:.4f} | Val Loss: {valLoss:.4f}")
         print(f"Train PSNR - Noisy: {trainNoisyPsnr:.2f} dB | Denoised: {trainDenoisedPsnr:.2f} dB")
         
-        if (epoch + 1) % 10 == 0:
+        if epoch % 10 == 0:
             evaluateModel(model, valLoader, epoch, outputDir, device)
             saveCheckpoint(model, optimizer, epoch, trainLoss)
 
