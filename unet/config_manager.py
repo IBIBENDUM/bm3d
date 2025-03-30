@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 import torch
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict
 
 @dataclass
@@ -15,7 +15,7 @@ class Config:
     checkpointInterval: int
     cleanTrainDir: str
     cleanValDir: str
-    extra: Dict[str, Any] = {}
+    extra: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if self.device == "cuda" and not torch.cuda.is_available():
