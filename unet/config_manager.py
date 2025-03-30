@@ -11,6 +11,7 @@ class Config:
     epochs: int
     batchSize: int
     numWorkers: int
+    enableCheckpoints: bool
     checkpointInterval: int
     cleanTrainDir: str
     cleanValDir: str
@@ -36,8 +37,17 @@ class ConfigManager:
             return json.load(file)
 
     def _validateConfig(self):
-        required_keys = ["device", "learningRate", "epochs", 
-                         "batchSize", "numWorkers", "checkpointInterval", "cleanTrainDir", "cleanValDir"]
+        required_keys = [
+            "device",
+            "learningRate",
+            "epochs",
+            "batchSize",
+            "numWorkers",
+            "checkpointInterval",
+            "cleanTrainDir",
+            "cleanValDir",
+            "enableCheckpoints",
+        ]
         for key in required_keys:
             if key not in self._rawConfig:
                 raise ValueError(f"Missing required config key: {key}")

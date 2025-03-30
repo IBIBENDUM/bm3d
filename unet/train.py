@@ -25,7 +25,8 @@ class ModelTrainer:
         self.outputDir = self.setupOutputDirectory()
 
         self.config = ConfigManager().config
-        self.checkpointManager = CheckpointManager()
+        if self.config.enableCheckpoints:
+            self.checkpointManager = CheckpointManager()
 
         self.model = UNet().to(self.config.device)
         self.criterion = nn.MSELoss()
@@ -156,7 +157,7 @@ class ModelTrainer:
 
 
     def train(self):
-        startEpoch = self.loadCheckpoint()
+        startEpoch = self.loadCheckpoint() if self.config.enableCheckpoints else 0
 
         for epoch in range(startEpoch, self.config["epochs"]):
             print(f"\nEpoch {epoch+1}/{self.config['epochs']}")
@@ -180,14 +181,15 @@ class ModelTrainer:
             
             if epoch % self.config.checkpointInterval == 0:
                 self.evaluateModel(epoch)
-                self.checkpointManager.save(
-                    model=self.model,
-                    optimizer=self.optimizer,
-                    epoch=epoch,
-                    loss=valMetrics['loss'],
-                    trainLosses=self.trainLosses,
-                    valLosses=self.valLosses
-                )
+                if self.config.enableCheckpoints:
+                    self.checkpointManager.save(
+                        model=self.model,
+                        optimizer=self.optimizer,
+                        epoch=epoch,
+                        loss=valMetrics['loss'],
+                        trainLosses=self.trainLosses,
+                        valLosses=self.valLosses
+                    )
         
         self.saveResults()
 

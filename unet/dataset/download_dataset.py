@@ -26,5 +26,5 @@ def downloadDataset(datasetName: str="meriemelkhal/random",
     print(f"Dataset {datasetName} downloaded to {downloadDir}")
 
 if __name__ == "__main__":
-    downloadDataset("tarekmebrouk/cbsd68")
+    downloadDataset("prasunroy/natural-images")
 
