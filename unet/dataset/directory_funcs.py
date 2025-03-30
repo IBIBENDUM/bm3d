@@ -8,12 +8,7 @@ def moveImagesToRoot(rootDir: str = "original_dataset") -> None:
         if path.is_file() and path.suffix.lower() in ['.jpg', '.png', '.jpeg']:
             destPath = rootPath / path.name
             if destPath.exists():
-                base = destPath.stem
-                ext = destPath.suffix
-                i = 1
-                while (rootPath / f"{base}_{i}{ext}").exists():
-                    i += 1
-                destPath = rootPath / f"{base}_{i}{ext}"
+                continue
             shutil.move(str(path), str(destPath))
 
 def removeSubdirs(rootDir: str = "original_dataset") -> None:

@@ -16,12 +16,12 @@ def cropImage(image, cropSize = (128, 128)):
 
 def getValidImagePaths(sourceDir, minSize=(512,512)):
     sourcePath = Path(sourceDir)
-    minSize = minSize or (0, 0)
-    validImages = [
-        file.name for file in sourcePath.iterdir()
-        if file.suffix.lower() in ('.jpg', '.png', '.jpeg') and
-           imagesize.get(str(file)) >= minSize
-    ]
+    validImages = []
+    for file in sourcePath.iterdir():
+        if file.suffix.lower() in ('.jpg', '.png', '.jpeg'):
+            width, height = imagesize.get(str(file))
+            if width >= minSize[0] and height >= minSize[1]:
+                validImages.append(file.name)
 
     return validImages
 
