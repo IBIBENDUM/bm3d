@@ -1,5 +1,7 @@
 import torch
+from datetime import datetime
 from pathlib import Path
+import shutil
 
 def getCheckpointDir():
     if Path("/content/drive/My Drive").exists():
@@ -11,27 +13,31 @@ def getCheckpointDir():
 
     return checkpointDir
 
-def saveCheckpoint(model, optimizer, epoch, loss, filename="modelCheckpoint.pth"):
+
+def saveCheckpoint(model, optimizer, epoch, loss, trainLosses, valLosses, filename="modelCheckpoint.pth"):
     checkpointDir = getCheckpointDir()
     checkpointPath = checkpointDir / filename
     backupPath = checkpointPath.with_suffix(".bak")
 
-    torch.save({
+    checkpoint = {
         'epoch': epoch,
         'modelStateDict': model.state_dict(),
         'optimizerStateDict': optimizer.state_dict(),
-        'loss': loss
-    }, checkpointPath)
+        'loss': loss,
+        'trainLosses': trainLosses,
+        'valLosses': valLosses,
+        'metadata': {
+            'saveTime': datetime.now().isoformat(),
+            'pytorchVersion': torch.__version__
+        }
+    }
 
-    torch.save({
-        'epoch': epoch,
-        'modelStateDict': model.state_dict(),
-        'optimizerStateDict': optimizer.state_dict(),
-        'loss': loss
-    }, backupPath)
+    torch.save(checkpoint, checkpointPath)
+    shutil.copy2(checkpointPath, backupPath)
 
     print(f"Checkpoint saved at {checkpointPath}")
     print(f"Backup checkpoint saved at {backupPath}")
+
 
 def loadCheckpoint(model, optimizer, filename="modelCheckpoint.pth"):
     checkpointDir = getCheckpointDir()
@@ -47,9 +53,13 @@ def loadCheckpoint(model, optimizer, filename="modelCheckpoint.pth"):
 
     model.load_state_dict(checkpoint['modelStateDict'])
     optimizer.load_state_dict(checkpoint['optimizerStateDict'])
-    epoch = checkpoint['epoch']
-    loss = checkpoint['loss']
-
-    print(f"Checkpoint loaded from {checkpointPath}")
-
-    return model, optimizer, epoch, loss
+    
+    return {
+        'model': model,
+        'optimizer': optimizer,
+        'epoch': checkpoint['epoch'],
+        'loss': checkpoint['loss'],
+        'trainLosses': checkpoint.get('trainLosses', []),
+        'valLosses': checkpoint.get('valLosses', []),
+        'metadata': checkpoint.get('metadata', {})
+    }
