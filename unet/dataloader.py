@@ -66,7 +66,7 @@ class ImageDataset(Dataset):
                 )
 
         # Clip to valid range
-        return torch.clamp(noisyImg, 0, 1)
+        return torch.clamp(noisyImg, 0, 1).float()
 
 
 def getDataLoader(
