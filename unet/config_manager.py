@@ -30,7 +30,28 @@ class ConfigManager:
         self._configPath = Path(configPath)
         self._rawConfig = self._loadConfig()
         self._validateConfig()
-        self.config = Config(**self._rawConfig, extra=self._rawConfig)
+        self.config = self._create_config()
+
+    def _create_config(self):
+        main_params = {
+            'cleanTrainDir': self._rawConfig['cleanTrainDir'],
+            'cleanValDir': self._rawConfig['cleanValDir'],
+            'batchSize': self._rawConfig['batchSize'],
+            'numWorkers': self._rawConfig['numWorkers'],
+            'learningRate': self._rawConfig['learningRate'],
+            'epochs': self._rawConfig['epochs'],
+            'device': self._rawConfig['device'],
+            'enableCheckpoints': self._rawConfig['enableCheckpoints'],
+            'checkpointInterval': self._rawConfig['checkpointInterval']
+        }
+        
+        extra_params = {
+            k: v for k, v in self._rawConfig.items()
+            if k not in main_params
+        }
+        
+        return Config(**main_params, extra=extra_params)
+
 
     def _loadConfig(self):
         with open(self._configPath, "r") as file:

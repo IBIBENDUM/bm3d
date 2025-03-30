@@ -5,10 +5,8 @@
     "batchSize": 16,
     "numWorkers": 10,
     "learningRate": 0.001,
-    "epochs": 200,
+    "epochs": 100,
     "device": "cuda",
     "enableCheckpoints": false,
-    "checkpointInterval": 5,
-    
-    "modelSavePath": "denoising_unet.pth"
+    "checkpointInterval": 5
 }

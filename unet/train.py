@@ -190,7 +190,7 @@ class ModelTrainer:
                         trainLosses=self.trainLosses,
                         valLosses=self.valLosses
                     )
-        
+
         self.saveResults()
 
 
