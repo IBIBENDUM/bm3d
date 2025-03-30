@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
+from torchvision.transforms.v2 import GaussianNoise
 from PIL import Image
 from pathlib import Path
 import random
@@ -41,7 +42,7 @@ class ImageDataset(Dataset):
             case "gaussian":
                 # Random std between 50 and 5
                 noiseLevel = random.uniform(5, 50)
-                noiseTransform = transforms.GaussianNoise(
+                noiseTransform = GaussianNoise(
                     mean=0.0, sigma=noiseLevel / 255, clip=True
                 )
                 noisyImg = noiseTransform(noisyImg)
