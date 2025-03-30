@@ -3,10 +3,10 @@
     "cleanValDir": "dataset/split_dataset/test/",
     
     "batchSize": 16,
-    "numWorkers": 10,
+    "numWorkers": 4,
     "learningRate": 0.001,
     "epochs": 100,
     "device": "cuda",
-    "enableCheckpoints": false,
+    "enableCheckpoints": true,
     "checkpointInterval": 5
 }
