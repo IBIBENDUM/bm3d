@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from datetime import datetime
 import catppuccin
+import piq
 
 def setGraphStyle():
     plt.style.use("latte")
@@ -23,12 +24,12 @@ def saveExamples(noisy, denoised, clean, epoch, outputDir="epoch_outputs", numEx
     for i in range(numExamples):
         plt.subplot(3, numExamples, i+1)
         plt.imshow(noisy[i].squeeze(), cmap='gray')
-        plt.title("Noisy")
+        plt.title(f"Noisy\n PSNR: {piq.psnr(noisy[i], clean[i]):.2f} dB")
         plt.axis('off')
         
         plt.subplot(3, numExamples, i+numExamples+1)
         plt.imshow(denoised[i].squeeze(), cmap='gray')
-        plt.title("Denoised")
+        plt.title(f"Denoised\n PSNR: {piq.psnr(denoised[i], clean[i]):.2f} dB")
         plt.axis('off')
         
         plt.subplot(3, numExamples, i+2*numExamples+1)
