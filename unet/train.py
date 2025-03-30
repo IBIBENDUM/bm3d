@@ -24,6 +24,7 @@ def loadConfig(configPath="config.json"):
 
     return config
 
+
 def setupOutputDirectory():
     """ Create output directory with timestamp """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -31,6 +32,7 @@ def setupOutputDirectory():
     outputDir.mkdir(parents=True, exist_ok=True)
 
     return outputDir
+
 
 def runEpoch(model, dataLoader, criterion, optimizer, device, isTraining):
     """ Run one epoch of training or validation """
@@ -44,9 +46,8 @@ def runEpoch(model, dataLoader, criterion, optimizer, device, isTraining):
         mode = torch.inference_mode()
 
     epochLoss = 0
-    totalNoisyPsnr = 0
-    totalDenoisedPsnr = 0
-    numBatches = 0
+    num_samples = 0
+    total_psnr_diff = 0
 
     with mode:
         for noisy, clean in tqdm(dataLoader, desc=desc):
@@ -63,19 +64,18 @@ def runEpoch(model, dataLoader, criterion, optimizer, device, isTraining):
              
             # Calculate PSNRs
             outputs = (outputs - outputs.min()) / (outputs.max() - outputs.min())
-            batchNoisyPsnr = piq.psnr(noisy, clean)
-            batchDenoisedPsnr = piq.psnr(outputs, clean)
+            batch_size = noisy.size(0)
+            for i in range(batch_size):
+                noisy_psnr = piq.psnr(noisy[i:i+1], clean[i:i+1])
+                denoised_psnr = piq.psnr(outputs[i:i+1], clean[i:i+1])
+                total_psnr_diff += (denoised_psnr - noisy_psnr).item()
             
-            totalNoisyPsnr += batchNoisyPsnr
-            totalDenoisedPsnr += batchDenoisedPsnr
-            numBatches += 1
-            
-            epochLoss += loss.item() * noisy.size(0)
+            num_samples += batch_size
+            epochLoss += loss.item() * batch_size
     
-    avgNoisyPsnr = totalNoisyPsnr / numBatches
-    avgDenoisedPsnr = totalDenoisedPsnr / numBatches
+    avg_psnr_improvement = total_psnr_diff / num_samples
     
-    return epochLoss / len(dataLoader.dataset), avgNoisyPsnr, avgDenoisedPsnr
+    return epochLoss / len(dataLoader.dataset), avg_psnr_improvement
 
 
 def initModel(outputDir, config):
@@ -130,41 +130,35 @@ def trainModel():
     )
 
     trainLosses, valLosses = [], []
-    trainNoisyPsnrs, trainDenoisedPsnrs = [], []
-    valNoisyPsnrs, valDenoisedPsnrs = [], []
 
-    earlyStopping = EarlyStopping(patience=10, minDelta=0.005)
+    # earlyStopping = EarlyStopping(patience=10, minDelta=0.005)
     
     for epoch in range(startEpoch, config['epochs']):
         print(f"\nEpoch {epoch+1}/{config['epochs']}")
         
         # Training phase
-        trainLoss, trainNoisyPsnr, trainDenoisedPsnr = runEpoch(
+        trainLoss, trainPsnrImp = runEpoch(
             model, trainLoader, criterion, optimizer, device, isTraining=True)
         
         trainLosses.append(trainLoss)
-        trainNoisyPsnrs.append(trainNoisyPsnr)
-        trainDenoisedPsnrs.append(trainDenoisedPsnr)
         
         # Validation phase
-        valLoss, valNoisyPsnr, valDenoisedPsnr = runEpoch(
+        valLoss, valPsnrImp = runEpoch(
             model, valLoader, criterion, None, device, isTraining=False)
         
         valLosses.append(valLoss)
-        valNoisyPsnrs.append(valNoisyPsnr)
-        valDenoisedPsnrs.append(valDenoisedPsnr)
         
         print(f"Train Loss: {trainLoss:.4f} | Val Loss: {valLoss:.4f}")
-        print(f"Train PSNR - Noisy: {trainNoisyPsnr:.2f} dB | Denoised: {trainDenoisedPsnr:.2f} dB")
+        print(f"PSNR Improvement: Train: {trainPsnrImp:.2f} dB | Val: {valPsnrImp:.2f} dB")
         
         if epoch % 10 == 0:
             evaluateModel(model, valLoader, epoch, outputDir, device)
             saveCheckpoint(model, optimizer, epoch, trainLoss)
 
-        earlyStopping(valLoss)
-        if earlyStopping.earlyStop:
-            print("Early stopping triggered!")
-            break
+        # earlyStopping(valLoss)
+        # if earlyStopping.earlyStop:
+        #     print("Early stopping triggered!")
+        #     break
     
     # Save results
     torch.save(model.state_dict(), config['modelSavePath'])
