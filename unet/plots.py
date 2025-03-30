@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from datetime import datetime
 import catppuccin
+import csv
 import piq
 
 def setGraphStyle():
@@ -24,12 +25,12 @@ def saveExamples(noisy, denoised, clean, epoch, outputDir="epoch_outputs", numEx
     for i in range(numExamples):
         plt.subplot(3, numExamples, i+1)
         plt.imshow(noisy[i].squeeze(), cmap='gray')
-        plt.title(f"Noisy\n PSNR: {piq.psnr(noisy[i], clean[i]):.2f} dB")
+        plt.title(f"Noisy\n PSNR: {piq.psnr(noisy[i].unsqueeze(0), clean[i].unsqueeze(0)):.2f} dB")
         plt.axis('off')
         
         plt.subplot(3, numExamples, i+numExamples+1)
         plt.imshow(denoised[i].squeeze(), cmap='gray')
-        plt.title(f"Denoised\n PSNR: {piq.psnr(denoised[i], clean[i]):.2f} dB")
+        plt.title(f"Denoised\n PSNR: {piq.psnr(denoised[i].unsqueeze(0), clean[i].unsqueeze(0)):.2f} dB")
         plt.axis('off')
         
         plt.subplot(3, numExamples, i+2*numExamples+1)
@@ -58,7 +59,19 @@ def saveLosses(trainLosses, valLosses, outputDir="results"):
     plt.legend()
     plt.grid()
     
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = outputPath / f"losses_{timestamp}.png"
+    filename = outputPath / f"lossesPlot.png"
     plt.savefig(filename)
     plt.close()
+
+def saveLossesToCSV(trainLosses, valLosses, outputDir="results"):
+    outputPath = Path(outputDir)
+    outputPath.mkdir(parents=True, exist_ok=True)
+
+    filename = outputPath / f"lossesTable.csv"
+    
+    with open(filename, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Epoch', 'Train Loss', 'Val Loss'])
+        
+        for epoch, (trainLoss, valLoss) in enumerate(zip(trainLosses, valLosses)):
+            writer.writerow([epoch + 1, trainLoss, valLoss])

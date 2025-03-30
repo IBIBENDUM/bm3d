@@ -11,7 +11,7 @@ from tqdm import tqdm
 from model import UNet
 from dataloader import getDataLoader
 from early_stopping import EarlyStopping
-from plots import saveExamples, saveLosses
+from plots import saveExamples, saveLosses, saveLossesToCSV
 from checkpoints import saveCheckpoint, loadCheckpoint
 
 
@@ -74,7 +74,6 @@ def runEpoch(model, dataLoader, criterion, optimizer, device, isTraining):
     
     avgNoisyPsnr = totalNoisyPsnr / numBatches
     avgDenoisedPsnr = totalDenoisedPsnr / numBatches
-    print(epochLoss / len(dataLoader.dataset))
     
     return epochLoss / len(dataLoader.dataset), avgNoisyPsnr, avgDenoisedPsnr
 
@@ -170,6 +169,7 @@ def trainModel():
     # Save results
     torch.save(model.state_dict(), config['modelSavePath'])
     saveLosses(trainLosses, valLosses, str(outputDir))
+    saveLossesToCSV(trainLosses, valLosses, str(outputDir))
 
     return model
 
