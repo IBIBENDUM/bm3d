@@ -2,8 +2,8 @@ import torch
 from pathlib import Path
 
 def getCheckpointDir():
-    if Path("/content/drive").exists():
-        checkpointDir = Path("/content/drive/unet/checkpoints")
+    if Path("/content/drive/My Drive").exists():
+        checkpointDir = Path("/content/drive/My Drive/unet/checkpoints")
     else:
         checkpointDir = Path("checkpoints")
     
