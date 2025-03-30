@@ -11,7 +11,10 @@ def setGraphStyle():
     plt.rcParams['axes.facecolor'] = 'white'
     plt.rcParams['savefig.facecolor'] = 'white'
 
-def saveExamples(noisy, denoised, clean, epoch, outputDir="epoch_outputs", numExamples=3):
+
+def plotAndSaveExamples(
+    noisy, denoised, clean, epoch, outputDir="epoch_outputs", numExamples=3
+):
     Path(outputDir).mkdir(parents=True, exist_ok=True)
 
     setGraphStyle()
@@ -44,34 +47,80 @@ def saveExamples(noisy, denoised, clean, epoch, outputDir="epoch_outputs", numEx
     plt.savefig(filename)
     plt.close()
 
-def saveLosses(trainLosses, valLosses, outputDir="results"):
+
+def plotAndSaveData(yValues, labels, yLabel, xLabel, title, outputDir, filename):
     outputPath = Path(outputDir)
     outputPath.mkdir(parents=True, exist_ok=True)
 
     setGraphStyle()
-    
+
     plt.figure(figsize=(10, 5))
-    plt.plot(trainLosses, label='Train Loss')
-    plt.plot(valLosses, label='Validation Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title(f'Training and Validation Loss')
+    for y, label in zip(yValues, labels):
+        plt.plot(y, label=label)
+    plt.xlabel(xLabel)
+    plt.ylabel(yLabel)
+    plt.title(title)
     plt.legend()
     plt.grid()
-    
-    filename = outputPath / f"lossesPlot.png"
-    plt.savefig(filename)
+
+    filePath = outputPath / filename
+    plt.savefig(filePath)
     plt.close()
 
-def saveLossesToCSV(trainLosses, valLosses, outputDir="results"):
+
+def plotLosses(trainLosses, valLosses, outputDir="results"):
+    plotAndSaveData(
+        yValues=[trainLosses, valLosses],
+        labels=["Train Loss", "Validation Loss"],
+        yLabel="Loss",
+        xLabel="Epoch",
+        title="Training and Validation Loss",
+        outputDir=outputDir,
+        filename="lossesPlot.png",
+    )
+
+
+def plotPsnrImprovements(trainImps, valImps, outputDir="results"):
+    plotAndSaveData(
+        yValues=[trainImps, valImps],
+        labels=["Train PSNR Improvement", "Validation PSNR Improvement"],
+        yLabel="PSNR Improvement (dB)",
+        xLabel="Epoch",
+        title="Denoising Quality Improvement",
+        outputDir=outputDir,
+        filename="psnr_improvements.png",
+    )
+
+
+def saveDataToCSV(data, headers, outputDir, filename):
     outputPath = Path(outputDir)
     outputPath.mkdir(parents=True, exist_ok=True)
 
-    filename = outputPath / f"lossesTable.csv"
-    
-    with open(filename, mode='w', newline='') as file:
+    filePath = outputPath / filename
+
+    with open(filePath, mode="w", newline="") as file:
         writer = csv.writer(file)
-        writer.writerow(['Epoch', 'Train Loss', 'Val Loss'])
+        writer.writerow(headers)
         
-        for epoch, (trainLoss, valLoss) in enumerate(zip(trainLosses, valLosses)):
-            writer.writerow([epoch + 1, trainLoss, valLoss])
+        for row in data:
+            writer.writerow(row)
+
+
+def saveLossesToCSV(trainLosses, valLosses, outputDir="results"):
+    data = [
+        (epoch + 1, trainLoss, valLoss)
+        for epoch, (trainLoss, valLoss) in enumerate(zip(trainLosses, valLosses))
+    ]
+    headers = ["Epoch", "Train Loss", "Val Loss"]
+
+    saveDataToCSV(data, headers, outputDir, "lossesTable.csv")
+
+
+def savePsnrImprovementsToCSV(trainImps, valImps, outputDir="results"):
+    data = [
+        (epoch + 1, trainImp, valImp)
+        for epoch, (trainImp, valImp) in enumerate(zip(trainImps, valImps))
+    ]
+    headers = ["Epoch", "Train PSNR Improvement", "Val PSNR Improvement"]
+
+    saveDataToCSV(data, headers, outputDir, "psnrImprovementsTable.csv")

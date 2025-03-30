@@ -11,7 +11,13 @@ from tqdm import tqdm
 from model import UNet
 from dataloader import getDataLoader
 from early_stopping import EarlyStopping
-from plots import saveExamples, saveLosses, saveLossesToCSV
+from plots import (
+    plotAndSaveExamples,
+    plotLosses,
+    plotPsnrImprovements,
+    saveLossesToCSV,
+    savePsnrImprovementsToCSV,
+)
 from checkpoints import saveCheckpoint, loadCheckpoint
 
 
@@ -96,7 +102,7 @@ def evaluateModel(model, dataLoader, epoch, outputDir, device):
     
     with torch.no_grad():
         sampleDenoised = model(sampleNoisy)
-        saveExamples(sampleNoisy, sampleDenoised, sampleClean, epoch, outputDir)
+        plotAndSaveExamples(sampleNoisy, sampleDenoised, sampleClean, epoch, outputDir)
 
 
 def trainModel():
@@ -108,11 +114,20 @@ def trainModel():
     model, criterion, optimizer = initModel(outputDir, config)
     device = config["device"]
 
+    startEpoch = 0
+    trainLosses, valLosses = [], []
+    trainPsnrImps, valPsnrImps = [], []
+
     try:
-        model, optimizer, startEpoch, startLoss = loadCheckpoint(model, optimizer)
-        print(f"Resuming from epoch {startEpoch} with loss {startLoss:.4f}")
+        checkpointData = loadCheckpoint(model, optimizer)
+        model = checkpointData['model']
+        optimizer = checkpointData['optimizer']
+        startEpoch = checkpointData['epoch'] + 1 
+        trainLosses = checkpointData['train_losses']
+        valLosses = checkpointData['val_losses']
+        print(f"Resuming from epoch {startEpoch} with last loss {checkpointData['loss']:.4f}")
+
     except FileNotFoundError:
-        startEpoch = 0
         print("No checkpoint found. Starting from scratch.")
 
     trainLoader = getDataLoader(
@@ -129,7 +144,6 @@ def trainModel():
         shuffle=False,
     )
 
-    trainLosses, valLosses = [], []
 
     # earlyStopping = EarlyStopping(patience=10, minDelta=0.005)
     
@@ -141,19 +155,28 @@ def trainModel():
             model, trainLoader, criterion, optimizer, device, isTraining=True)
         
         trainLosses.append(trainLoss)
+        trainPsnrImps.append(trainPsnrImp)
         
         # Validation phase
         valLoss, valPsnrImp = runEpoch(
             model, valLoader, criterion, None, device, isTraining=False)
         
         valLosses.append(valLoss)
+        valPsnrImps.append(valPsnrImps)
         
         print(f"Train Loss: {trainLoss:.4f} | Val Loss: {valLoss:.4f}")
         print(f"PSNR Improvement: Train: {trainPsnrImp:.2f} dB | Val: {valPsnrImp:.2f} dB")
         
-        if epoch % 10 == 0:
+        if epoch % config.get('checkpointInterval', 10) == 0:
             evaluateModel(model, valLoader, epoch, outputDir, device)
-            saveCheckpoint(model, optimizer, epoch, trainLoss)
+            saveCheckpoint(
+                model=model,
+                optimizer=optimizer,
+                epoch=epoch,
+                loss=valLoss,
+                trainLosses=trainLosses,
+                valLosses=valLosses
+            )
 
         # earlyStopping(valLoss)
         # if earlyStopping.earlyStop:
@@ -162,8 +185,10 @@ def trainModel():
     
     # Save results
     torch.save(model.state_dict(), config['modelSavePath'])
-    saveLosses(trainLosses, valLosses, str(outputDir))
+    plotLosses(trainLosses, valLosses, str(outputDir))
     saveLossesToCSV(trainLosses, valLosses, str(outputDir))
+    plotPsnrImprovements(trainPsnrImps, trainPsnrImps, str(outputDir))
+    savePsnrImprovementsToCSV(trainPsnrImps, trainPsnrImps, str(outputDir))
 
     return model
 
