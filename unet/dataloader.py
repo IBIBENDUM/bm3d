@@ -1,19 +1,35 @@
 import torch
 from torch.utils.data import DataLoader, Dataset
-from torchvision import transforms
 from torchvision.transforms.v2 import GaussianNoise
+from torchvision import transforms
 from PIL import Image
 from pathlib import Path
 import random
 from skimage.util import random_noise
 
 class ImageDataset(Dataset):
-    def __init__(self, sourceDir, transform=None, mode="L"):
+    # Noise in range from 15 to 35 PSNR
+    noiseParams = {
+        "gaussian": (5, 50),
+        "salt_pepper": (0.001, 0.1),
+        "poisson": (20, 1500),
+        "speckle": (0.05, 0.3),
+    }
+
+    def __init__(
+        self,
+        sourceDir,
+        baseTransform=transforms.Compose([transforms.ToTensor()]),
+        augmentTransform=None,
+        mode="L",
+        augmentProb=0.5,
+    ):
         self.sourcePath = Path(sourceDir)
         self.images = sorted(self.sourcePath.glob("*"))
         self.mode = mode  # "L" or "RGB"
-        self.baseTransform = transforms.Compose([transforms.ToTensor()])
-        self.augmentTransform = transform if transform else None
+        self.baseTransform = baseTransform
+        self.augmentTransform = augmentTransform if augmentTransform else None
+        self.augmentProb = augmentProb
 
     def __len__(self):
         return len(self.images)
@@ -22,7 +38,7 @@ class ImageDataset(Dataset):
         cleanImg = Image.open(self.images[idx]).convert(self.mode)
         cleanImg = self.baseTransform(cleanImg)
 
-        if self.augmentTransform and random.random() > 0.5:
+        if self.augmentTransform and random.random() < self.augmentProb:
             cleanImg = self.augmentTransform(cleanImg)
 
         noisyImg = self.addRandomNoise(cleanImg)
@@ -34,34 +50,27 @@ class ImageDataset(Dataset):
         Add random noise to the image with random parameters
         """
         # Randomly select noise type
-        noiseType = random.choice(["gaussian", "salt_pepper", "poisson", "speckle"])
+        noiseType = random.choice(list(ImageDataset.noiseParams.keys()))
         noisyImg = image.clone()
+        minVal, maxVal = ImageDataset.noiseParams[noiseType]
+        noiseLevel = random.uniform(minVal, maxVal)
 
-        # Apply noise in range from 15 to 35 PSNR
         match noiseType:
             case "gaussian":
-                # Random std between 50 and 5
-                noiseLevel = random.uniform(5, 50)
                 noiseTransform = GaussianNoise(
                     mean=0.0, sigma=noiseLevel / 255, clip=True
                 )
                 noisyImg = noiseTransform(noisyImg)
 
             case "salt_pepper":
-                # Random amount between 0.1 and 0.001
-                noiseLevel = random.uniform(0.001, 0.1)
                 noisyImg = torch.tensor(
                     random_noise(noisyImg.numpy(), mode="salt", amount=noiseLevel)
                 )
 
             case "poisson":
-                # Random lambda between 20 and 1500
-                noiseLevel = random.uniform(20, 1500)
                 noisyImg = torch.poisson(image * noiseLevel) / noiseLevel
 
             case "speckle":
-                # Random std between 0.05 and 0.3
-                noiseLevel = random.uniform(30, 0.2)
                 noisyImg = torch.tensor(
                     random_noise(image.numpy(), mode="speckle", var=noiseLevel / 255)
                 )
@@ -86,12 +95,15 @@ def getDataLoader(
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomVerticalFlip(),
                 transforms.RandomRotation(90),
-                transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9,1.1)),
-                transforms.RandomPerspective(distortion_scale=0.5)
+                transforms.RandomAffine(
+                    degrees=0, translate=(0.1, 0.1), scale=(1, 1.25)
+                ),
             ]
         )
 
-    dataset = ImageDataset(sourceDir=sourceDir, mode=mode, transform=augmentTransform)
+    dataset = ImageDataset(
+        sourceDir=sourceDir, mode=mode, augmentTransform=augmentTransform
+    )
 
     dataLoader = DataLoader(
         dataset,
