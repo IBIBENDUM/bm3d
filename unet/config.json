@@ -1,6 +1,7 @@
 {
     "cleanTrainDir": "dataset/split_dataset/train/",
     "cleanValDir": "dataset/split_dataset/test/",
+    "checkpointDir": "checkpoint/",
     
     "loss": "mse",
     "batchSize": 16,

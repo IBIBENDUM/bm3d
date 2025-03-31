@@ -13,6 +13,7 @@ class Config:
     numWorkers: int
     enableCheckpoints: bool
     checkpointInterval: int
+    checkpointDir: str
     cleanTrainDir: str
     loss: str
     cleanValDir: str
@@ -37,6 +38,7 @@ class ConfigManager:
         main_params = {
             'cleanTrainDir': self._rawConfig['cleanTrainDir'],
             'cleanValDir': self._rawConfig['cleanValDir'],
+            'checkpointDir': self._rawConfig['checkpointDir'],
             'batchSize': self._rawConfig['batchSize'],
             'numWorkers': self._rawConfig['numWorkers'],
             'learningRate': self._rawConfig['learningRate'],
@@ -69,6 +71,7 @@ class ConfigManager:
             "checkpointInterval",
             "cleanTrainDir",
             "cleanValDir",
+            "checkpointDir",
             "enableCheckpoints",
             "loss",
         ]

@@ -26,7 +26,7 @@ class ModelTrainer:
 
         self.config = ConfigManager().config
         if self.config.enableCheckpoints:
-            self.checkpointManager = CheckpointManager()
+            self.checkpointManager = CheckpointManager(self.config.checkpointDir)
 
         self.model = UNet().to(self.config.device)
         self.criterion = nn.MSELoss()
