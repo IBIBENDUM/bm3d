@@ -14,6 +14,7 @@ class Config:
     enableCheckpoints: bool
     checkpointInterval: int
     cleanTrainDir: str
+    loss: str
     cleanValDir: str
     extra: Dict[str, Any] = field(default_factory=dict)
 
@@ -42,7 +43,8 @@ class ConfigManager:
             'epochs': self._rawConfig['epochs'],
             'device': self._rawConfig['device'],
             'enableCheckpoints': self._rawConfig['enableCheckpoints'],
-            'checkpointInterval': self._rawConfig['checkpointInterval']
+            'checkpointInterval': self._rawConfig['checkpointInterval'],
+            'loss': self._rawConfig['loss']
         }
         
         extra_params = {
@@ -68,6 +70,7 @@ class ConfigManager:
             "cleanTrainDir",
             "cleanValDir",
             "enableCheckpoints",
+            "loss",
         ]
         for key in required_keys:
             if key not in self._rawConfig:

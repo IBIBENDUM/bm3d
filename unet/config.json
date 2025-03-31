@@ -2,6 +2,7 @@
     "cleanTrainDir": "dataset/split_dataset/train/",
     "cleanValDir": "dataset/split_dataset/test/",
     
+    "loss": "mse",
     "batchSize": 16,
     "numWorkers": 4,
     "learningRate": 0.001,

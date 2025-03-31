@@ -4,7 +4,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import piq
+import piq 
 from tqdm import tqdm
 
 from model import UNet
@@ -42,6 +42,19 @@ class ModelTrainer:
         self.valPsnrImps = []
 
 
+    def initLossFunction(self):
+        match self.config.loss.lower():
+            case "l1" | "mae":
+                return nn.L1Loss()
+            case "l2" | "mse":
+                return nn.MSELoss()
+            case "smooth_l1":
+                return nn.SmoothL1Loss()
+            case "ssim":
+                return piq.SSIMLoss()
+            case _:
+                raise ValueError(f"Unknown loss function: {self.config.loss}")
+
     def setupOutputDirectory(self):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         outputDir = Path("results") / f"run_{timestamp}"
@@ -64,9 +77,9 @@ class ModelTrainer:
             sourceDir=self.config.cleanValDir,
             batchSize=self.config.batchSize,
             numWorkers=self.config.numWorkers,
+            augment=False,
             shuffle=False,
         )
-
 
     def runEpoch(self, dataLoader, isTraining):
         if isTraining:
@@ -196,4 +209,4 @@ class ModelTrainer:
 
 if __name__ == "__main__":
     trainer = ModelTrainer()
-    trainer.train()
+    # trainer.train()
