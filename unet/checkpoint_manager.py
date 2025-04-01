@@ -15,9 +15,9 @@ class CheckpointManager:
             return Path("/content/drive/My Drive/unet/checkpoints")
         return Path("checkpoints")
 
-    def _getFilePaths(self, fileName):
+    def _getFilePaths(self, fileName, epoch=1):
         mainPath = self.checkpointDir / fileName
-        backupPath = mainPath.with_suffix(".bak")
+        backupPath = mainPath.with_suffix(f"_epoch{epoch}.bak")
         return mainPath, backupPath
 
     def _createMetadata(self):
@@ -30,49 +30,38 @@ class CheckpointManager:
         self,
         model,
         optimizer,
-        logger,
         epoch,
-        loss,
-        trainLosses,
-        valLosses,
+        metrics,
         fileName="modelCheckpoint.pth",
     ):
-        mainPath, backupPath = self._getFilePaths(fileName)
+        mainPath, backupPath = self._getFilePaths(fileName, epoch)
         
         checkpoint = {
             'epoch': epoch,
             'modelStateDict': model.state_dict(),
             'optimizerStateDict': optimizer.state_dict(),
-            'loss': loss,
-            'trainLosses': trainLosses,
-            'valLosses': valLosses,
+            'metrics': metrics,
             'metadata': self._createMetadata()
         }
-
         torch.save(checkpoint, mainPath)
         shutil.copy2(mainPath, backupPath)
-        
-        logger.info(f"Checkpoint saved at {mainPath}")
-        logger.info(f"Backup saved at {backupPath}")
 
     def load(self, model, optimizer, fileName="modelCheckpoint.pth"):
-        mainPath, backupPath = self._getFilePaths(fileName)
+        mainPath, _ = self._getFilePaths(fileName)
         
         try:
-            checkpointPath = mainPath if mainPath.exists() else backupPath
+            checkpointPath = mainPath
             checkpoint = torch.load(checkpointPath)
             
             model.load_state_dict(checkpoint['modelStateDict'])
             optimizer.load_state_dict(checkpoint['optimizerStateDict'])
             
             return {
-                'model': model,
-                'optimizer': optimizer,
-                'epoch': checkpoint['epoch'],
-                'loss': checkpoint['loss'],
-                'trainLosses': checkpoint.get('trainLosses', []),
-                'valLosses': checkpoint.get('valLosses', []),
-                'metadata': checkpoint.get('metadata', {})
+                "model": model,
+                "optimizer": optimizer,
+                "epoch": checkpoint["epoch"],
+                "metrics": checkpoint["metrics"],
+                "metadata": checkpoint["metadata"]
             }
         except FileNotFoundError:
             raise FileNotFoundError("No checkpoint or backup found")

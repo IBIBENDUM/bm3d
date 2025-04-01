@@ -14,10 +14,8 @@ from dataloader import getDataLoader
 from logger import setupLogger
 from plots import (
     plotAndSaveExamples,
-    plotLosses,
-    plotPsnrImprovements,
-    saveLossesToCSV,
-    savePsnrImprovementsToCSV,
+    plotAndSaveData,
+    saveDataToCSV,
 )
 
 
@@ -42,11 +40,41 @@ class ModelTrainer:
         )
 
         self.initDataloaders()
-        self.trainLosses = []
-        self.valLosses = []
-        self.trainPsnrImps = []
-        self.valPsnrImps = []
+        self.initMetrics()
 
+    def initMetrics(self):
+        self.metrics = {
+            "train": {
+                "loss": [],
+                "psnrDiff": [],
+                "psnr": [],
+                "ssim": [],
+                "vif": [],
+                "fsim": [],
+            },
+            "val": {
+                "loss": [],
+                "psnrDiff": [],
+                "psnr": [],
+                "ssim": [],
+                "vif": [],
+                "fsim": [],
+            },
+        }
+
+    def calculateBatchMetrics(self, noisy, clean, outputs):
+        outputs = (outputs - outputs.min()) / (outputs.max() - outputs.min())
+
+        noisyPsnr = piq.psnr(noisy, clean)
+        denoisedPsnr = piq.psnr(outputs, clean)
+
+        return {
+            "psnrDiff": (denoisedPsnr - noisyPsnr).item(),
+            "psnr": denoisedPsnr.item(),
+            "ssim": piq.ssim(outputs, clean).item(),
+            "vif": piq.vif_p(outputs, clean).item(),
+            "fsim": piq.fsim(outputs, clean).item(),
+        }
 
     def initLossFunction(self):
         match self.config.loss.lower():
@@ -74,6 +102,7 @@ class ModelTrainer:
             sourceDir=self.config.cleanTrainDir,
             batchSize=self.config.batchSize,
             numWorkers=self.config.numWorkers,
+            augment=True,
             shuffle=True,
         )
 
@@ -95,8 +124,9 @@ class ModelTrainer:
             desc = "Validating"
             mode = torch.inference_mode()
 
-        epochLoss = 0
-        totalPsnrDiff = 0
+        epochMetrics = {
+            k: 0.0 for k in ["loss", "psnr_imp", "psnr", "ssim", "vif", "fsim"]
+        }
 
         with mode:
             for noisy, clean in tqdm(dataLoader, desc=desc):
@@ -110,27 +140,17 @@ class ModelTrainer:
                     loss.backward()
                     self.optimizer.step()
 
-                psnrDiff = self.calculatePsnrDiff(noisy, clean, outputs)
-                epochLoss += loss.item() * noisy.size(0)
-                totalPsnrDiff += psnrDiff
+                batchMetrics = self.calculateBatchMetrics(noisy, clean, outputs)
 
-        return {
-            'loss': epochLoss / len(dataLoader.dataset),
-            'psnrImp': totalPsnrDiff / len(dataLoader.dataset)
-        }
+                for k in epochMetrics:
+                    epochMetrics[k] += batchMetrics[k] * noisy.size(0)
 
-    
-    def calculatePsnrDiff(self, noisy, clean, outputs):
-        outputs = (outputs - outputs.min()) / (outputs.max() - outputs.min())
-        psnrDiff = 0
-        
-        for i in range(noisy.size(0)):
-            noisyPsnr = piq.psnr(noisy[i:i+1], clean[i:i+1])
-            denoisedPsnr = piq.psnr(outputs[i:i+1], clean[i:i+1])
-            psnrDiff += (denoisedPsnr - noisyPsnr).item()
-        
-        return psnrDiff
+        epochMetrics = {k: v / len(dataLoader.dataset) for k, v in epochMetrics.items()}
+        phaseMetrics = self.metrics["train" if isTraining else "val"]
+        for k in epochMetrics:
+            phaseMetrics[k].append(epochMetrics[k])
 
+        return epochMetrics
 
     def evaluateModel(self, epoch):
         sampleNoisy, sampleClean = next(iter(self.valLoader))
@@ -152,21 +172,41 @@ class ModelTrainer:
         modelSavePath = self.outputDir / "denoising_model.pth"
         torch.save(self.model.state_dict(), modelSavePath)
         
-        plotLosses(self.trainLosses, self.valLosses, str(self.outputDir))
-        saveLossesToCSV(self.trainLosses, self.valLosses, str(self.outputDir))
-        plotPsnrImprovements(self.trainPsnrImps, self.valPsnrImps, str(self.outputDir))
-        savePsnrImprovementsToCSV(self.trainPsnrImps, self.valPsnrImps, str(self.outputDir))
+        for metric in self.metrics["train"].keys():
+            plotAndSaveData(
+                yValues=[self.metrics["train"][metric],
+                         self.metrics["val"][metric]],
+                labels=[f"Train {metric}", f"Validation {metric}"],
+                yLabel=metric,
+                xLabel="Epoch",
+                title=f"Training and Validation {metric}",
+                outputDir=self.outputDir,
+                filename=f"{metric}_plot.png",
+            )
+
+            saveDataToCSV(
+                data=[
+                    (epoch + 1, train, val)
+                    for epoch, (train, val) in enumerate(
+                        zip(self.metrics["train"][metric], self.metrics["val"][metric])
+                    )
+                ],
+                headers=["epoch", f"train_{metric}", f"val_{metric}"],
+                outputDir=str(self.outputDir),
+                filename=f"{metric}.csv",
+            )
+
+        self.logger.info(f"All raw metrics saved to {self.outputDir}")
 
 
     def loadCheckpoint(self):
         try:
             checkpointData = self.checkpointManager.load(self.model, self.optimizer)
-            self.model = checkpointData['model']
-            self.optimizer = checkpointData['optimizer']
-            self.trainLosses = checkpointData['trainLosses']
-            self.valLosses = checkpointData['valLosses']
-            self.logger.info(f"Resuming from epoch {checkpointData['epoch'] + 1}")
-            return checkpointData['epoch'] + 1
+            self.model = checkpointData["model"]
+            self.optimizer = checkpointData["optimizer"]
+            self.metrics = checkpointData["metrics"]
+            self.logger.info(f"Resuming from epoch {checkpointData["epoch"] + 1}")
+            return checkpointData["epoch"] + 1
 
         except FileNotFoundError:
             self.logger.info("No checkpoint found. Starting from scratch.")
@@ -183,35 +223,23 @@ class ModelTrainer:
         for epoch in range(startEpoch, self.config["epochs"]):
             self.logger.info(f"\nEpoch {epoch+1}/{self.config['epochs']}")
             
-            trainMetrics = self.runEpoch(self.trainLoader, isTraining=True)
-            valMetrics = self.runEpoch(self.valLoader, isTraining=False)
+            self.runEpoch(self.trainLoader, isTraining=True)
+            self.runEpoch(self.valLoader, isTraining=False)
             
-            self.trainLosses.append(trainMetrics['loss'])
-            self.trainPsnrImps.append(trainMetrics['psnrImp'])
-            self.valLosses.append(valMetrics['loss'])
-            self.valPsnrImps.append(valMetrics['psnrImp'])
-            
-            self.logger.info(
-                f"Train Loss: {trainMetrics['loss']:.5f} | "
-                f"Val Loss: {valMetrics['loss']:.5f}"
-            )
-            self.logger.info(
-                f"PSNR Improvement: Train: {trainMetrics['psnrImp']:.2f} dB | "
-                f"Val: {valMetrics['psnrImp']:.2f} dB"
-            )
-            
-            if epoch+1 % self.config.checkpointInterval == 0:
-                self.logger.debug(f"Saving checkpoint at epoch {epoch+1}")
+            for metric in self.metrics["train"].keys():
+                self.logger.info(f"{metric}: {self.metrics["train"][metric]:.4f} (train) | "
+                                 f" {self.metrics["val"][metric]:.4f} (val)")
+
+            if (epoch + 1) % self.config.checkpointInterval == 0:
                 self.evaluateModel(epoch)
+                self.saveResults()
                 if self.config.enableCheckpoints:
+                    self.logger.debug(f"Saving checkpoint at epoch {epoch+1}")
                     self.checkpointManager.save(
                         model=self.model,
                         optimizer=self.optimizer,
-                        logger=self.logger,
                         epoch=epoch,
-                        loss=valMetrics['loss'],
-                        trainLosses=self.trainLosses,
-                        valLosses=self.valLosses
+                        metrics=self.metrics,
                     )
 
         self.logger.info(f"Final model and plots saved to {self.outputDir}")
