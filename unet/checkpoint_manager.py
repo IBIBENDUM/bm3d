@@ -26,7 +26,17 @@ class CheckpointManager:
             'pytorchVersion': torch.__version__
         }
 
-    def save(self, model, optimizer, epoch, loss, trainLosses, valLosses, fileName="modelCheckpoint.pth"):
+    def save(
+        self,
+        model,
+        optimizer,
+        logger,
+        epoch,
+        loss,
+        trainLosses,
+        valLosses,
+        fileName="modelCheckpoint.pth",
+    ):
         mainPath, backupPath = self._getFilePaths(fileName)
         
         checkpoint = {
@@ -42,8 +52,8 @@ class CheckpointManager:
         torch.save(checkpoint, mainPath)
         shutil.copy2(mainPath, backupPath)
         
-        print(f"Checkpoint saved at {mainPath}")
-        print(f"Backup saved at {backupPath}")
+        logger.info(f"Checkpoint saved at {mainPath}")
+        logger.info(f"Backup saved at {backupPath}")
 
     def load(self, model, optimizer, fileName="modelCheckpoint.pth"):
         mainPath, backupPath = self._getFilePaths(fileName)

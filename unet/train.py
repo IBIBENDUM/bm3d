@@ -11,6 +11,7 @@ from model import UNet
 from checkpoint_manager import CheckpointManager
 from config_manager import ConfigManager
 from dataloader import getDataLoader
+from logger import setupLogger
 from plots import (
     plotAndSaveExamples,
     plotLosses,
@@ -23,13 +24,18 @@ from plots import (
 class ModelTrainer:
     def __init__(self):
         self.outputDir = self.setupOutputDirectory()
+        self.logger = setupLogger(self.outputDir)
+        self.logger.info(f"Saving results to: {self.outputDir}")
 
         self.config = ConfigManager().config
+        self.logger.info(f"Used config: {self.config}")
         if self.config.enableCheckpoints:
             self.checkpointManager = CheckpointManager(self.config.checkpointDir)
+            self.logger.info(f"Checkpoints directory: {self.checkpointManager.checkpointDir}/")
+
 
         self.model = UNet().to(self.config.device)
-        self.criterion = nn.MSELoss()
+        self.criterion = self.initLossFunction()
         self.optimizer = optim.Adam(
             self.model.parameters(), 
             lr=self.config.learningRate
@@ -59,8 +65,6 @@ class ModelTrainer:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         outputDir = Path("results") / f"run_{timestamp}"
         outputDir.mkdir(parents=True, exist_ok=True)
-
-        print(f"Saving results to: {outputDir}")
 
         return outputDir
 
@@ -161,11 +165,15 @@ class ModelTrainer:
             self.optimizer = checkpointData['optimizer']
             self.trainLosses = checkpointData['trainLosses']
             self.valLosses = checkpointData['valLosses']
-            print(f"Resuming from epoch {checkpointData['epoch'] + 1}")
+            self.logger.info(f"Resuming from epoch {checkpointData['epoch'] + 1}")
             return checkpointData['epoch'] + 1
 
         except FileNotFoundError:
-            print("No checkpoint found. Starting from scratch.")
+            self.logger.info("No checkpoint found. Starting from scratch.")
+            return 0
+
+        except Exception as e:
+            self.logger.error(f"Error loading checkpoint: {str(e)}")
             return 0
 
 
@@ -173,7 +181,7 @@ class ModelTrainer:
         startEpoch = self.loadCheckpoint() if self.config.enableCheckpoints else 0
 
         for epoch in range(startEpoch, self.config["epochs"]):
-            print(f"\nEpoch {epoch+1}/{self.config['epochs']}")
+            self.logger.info(f"\nEpoch {epoch+1}/{self.config['epochs']}")
             
             trainMetrics = self.runEpoch(self.trainLoader, isTraining=True)
             valMetrics = self.runEpoch(self.valLoader, isTraining=False)
@@ -183,27 +191,30 @@ class ModelTrainer:
             self.valLosses.append(valMetrics['loss'])
             self.valPsnrImps.append(valMetrics['psnrImp'])
             
-            print(
-                f"Train Loss: {trainMetrics['loss']:.4f} | "
-                f"Val Loss: {valMetrics['loss']:.4f}"
+            self.logger.info(
+                f"Train Loss: {trainMetrics['loss']:.5f} | "
+                f"Val Loss: {valMetrics['loss']:.5f}"
             )
-            print(
+            self.logger.info(
                 f"PSNR Improvement: Train: {trainMetrics['psnrImp']:.2f} dB | "
                 f"Val: {valMetrics['psnrImp']:.2f} dB"
             )
             
-            if epoch % self.config.checkpointInterval == 0:
+            if epoch+1 % self.config.checkpointInterval == 0:
+                self.logger.debug(f"Saving checkpoint at epoch {epoch+1}")
                 self.evaluateModel(epoch)
                 if self.config.enableCheckpoints:
                     self.checkpointManager.save(
                         model=self.model,
                         optimizer=self.optimizer,
+                        logger=self.logger,
                         epoch=epoch,
                         loss=valMetrics['loss'],
                         trainLosses=self.trainLosses,
                         valLosses=self.valLosses
                     )
 
+        self.logger.info(f"Final model and plots saved to {self.outputDir}")
         self.saveResults()
 
 
