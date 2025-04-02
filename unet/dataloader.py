@@ -96,7 +96,7 @@ def getDataLoader(
                 transforms.RandomVerticalFlip(),
                 transforms.RandomRotation(90),
                 transforms.RandomAffine(
-                    degrees=0, translate=(0.1, 0.1), scale=(1, 1.25)
+                    degrees=0, scale=(1, 1.25)
                 ),
             ]
         )
@@ -114,3 +114,4 @@ def getDataLoader(
     )
 
     return dataLoader
+
