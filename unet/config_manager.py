@@ -1,92 +1,50 @@
 import json
-from pathlib import Path
 import torch
 from dataclasses import dataclass, field
 from typing import Any, Dict
 
 @dataclass
 class Config:
-    device: str
-    learningRate: float
-    epochs: int
-    batchSize: int
-    numWorkers: int
-    enableCheckpoints: bool
-    checkpointInterval: int
-    checkpointDir: str
-    cleanTrainDir: str
-    loss: str
-    cleanValDir: str
-    fixSeed: bool
-    seed: int
+    paths: Dict[str, str] = field(default_factory=dict)
+    train: Dict[str, Any] = field(default_factory=dict)
+    optimizer: Dict[str, Any] = field(default_factory=dict)
+    checkpoints: Dict[str, Any] = field(default_factory=dict)
+    random: Dict[str, Any] = field(default_factory=dict)
     extra: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
+        data = self._load_json("config.json")
+        self.paths.update(data.get("paths", {}))
+        self.train.update(data.get("train", {}))
+        self.optimizer.update(data.get("optimizer", {}))
+        self.checkpoints.update(data.get("checkpoints", {}))
+        self.random.update(data.get("random", {}))
+        self.extra.update(
+            {
+                k: v
+                for k, v in data.items()
+                if k not in {"paths", "train", "optimizer", "checkpoints", "random"}
+            }
+        )
+
         if self.device == "cuda" and not torch.cuda.is_available():
-            self.device = "cpu"
+            self.train["device"] = "cpu"
 
-    def __getitem__(self, key):
-        return self.extra.get(key, getattr(self, key, None))
+    def __getattr__(self, key):
+        for section in (
+            self.paths,
+            self.train,
+            self.optimizer,
+            self.checkpoints,
+            self.random,
+            self.extra,
+        ):
+            if key in section:
+                return section[key]
+        raise AttributeError(f"Config has no attribute '{key}'")
 
-
-class ConfigManager:
-    def __init__(self, configPath="config.json"):
-        self._configPath = Path(configPath)
-        self._rawConfig = self._loadConfig()
-        self._validateConfig()
-        self.config = self._create_config()
-
-    def _create_config(self):
-        main_params = {
-            'cleanTrainDir': self._rawConfig['cleanTrainDir'],
-            'cleanValDir': self._rawConfig['cleanValDir'],
-            'checkpointDir': self._rawConfig['checkpointDir'],
-            'batchSize': self._rawConfig['batchSize'],
-            'numWorkers': self._rawConfig['numWorkers'],
-            'learningRate': self._rawConfig['learningRate'],
-            'epochs': self._rawConfig['epochs'],
-            'device': self._rawConfig['device'],
-            'enableCheckpoints': self._rawConfig['enableCheckpoints'],
-            'checkpointInterval': self._rawConfig['checkpointInterval'],
-            'loss': self._rawConfig['loss'],
-            'fixSeed': self._rawConfig['fixSeed'],
-            'seed': self._rawConfig['seed'],
-        }
-        
-        extra_params = {
-            k: v for k, v in self._rawConfig.items()
-            if k not in main_params
-        }
-        
-        return Config(**main_params, extra=extra_params)
-
-
-    def _loadConfig(self):
-        with open(self._configPath, "r") as file:
+    @staticmethod
+    def _load_json(config_path: str):
+        with open(config_path, "r") as file:
             return json.load(file)
 
-    def _validateConfig(self):
-        required_keys = [
-            "device",
-            "learningRate",
-            "epochs",
-            "batchSize",
-            "numWorkers",
-            "checkpointInterval",
-            "cleanTrainDir",
-            "cleanValDir",
-            "checkpointDir",
-            "enableCheckpoints",
-            "loss",
-            "fixSeed",
-            "seed"
-        ]
-        for key in required_keys:
-            if key not in self._rawConfig:
-                raise ValueError(f"Missing required config key: {key}")
-
-    def __getattr__(self, name):
-        return getattr(self.config, name, None)
-
-    def __repr__(self):
-        return f"ConfigManager(configPath={self._configPath},\n config={self.config})"

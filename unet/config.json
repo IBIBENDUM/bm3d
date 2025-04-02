@@ -1,17 +1,33 @@
 {
-    "cleanTrainDir": "dataset/split_dataset/train/",
-    "cleanValDir": "dataset/split_dataset/test/",
-    "checkpointDir": "checkpoints/",
-    
-    "loss": "mse",
-    "batchSize": 16,
-    "numWorkers": 4,
-    "learningRate": 0.001,
-    "epochs": 100,
-    "device": "cuda",
-    "enableCheckpoints": true,
-    "checkpointInterval": 5,
+    "paths": {
+        "cleanTrainDir": "dataset/split_dataset/train/",
+        "cleanValDir": "dataset/split_dataset/test/",
+        "checkpointDir": "checkpoints/"
+    },
 
-    "fixSeed": true,
-    "seed": 42
+    "train": {
+        "batchSize": 16,
+        "numWorkers": 4,
+        "epochs": 100,
+        "device": "cuda"
+    },
+
+    "optimizer": {
+        "learningRate": 0.001,
+        "loss": "mse",
+        "scheduler": {
+            "stepsize": 30,
+            "gamma": 0.1
+        }
+    },
+    
+    "checkpoints": {
+        "enableCheckpoints": true,
+        "checkpointInterval": 5
+    },
+
+    "random": {
+        "fixSeed": true,
+        "seed": 42
+    } 
 }
