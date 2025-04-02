@@ -17,6 +17,8 @@ class Config:
     cleanTrainDir: str
     loss: str
     cleanValDir: str
+    fixSeed: bool
+    seed: int
     extra: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -46,7 +48,9 @@ class ConfigManager:
             'device': self._rawConfig['device'],
             'enableCheckpoints': self._rawConfig['enableCheckpoints'],
             'checkpointInterval': self._rawConfig['checkpointInterval'],
-            'loss': self._rawConfig['loss']
+            'loss': self._rawConfig['loss'],
+            'fixSeed': self._rawConfig['fixSeed'],
+            'seed': self._rawConfig['seed'],
         }
         
         extra_params = {
@@ -74,6 +78,8 @@ class ConfigManager:
             "checkpointDir",
             "enableCheckpoints",
             "loss",
+            "fixSeed",
+            "seed"
         ]
         for key in required_keys:
             if key not in self._rawConfig:

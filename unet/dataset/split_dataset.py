@@ -32,19 +32,22 @@ def processAndSaveImage(srcPath, dstPath, cropSize=None):
     cv2.imwrite(dstPath, image)
 
 
-def splitDataset(sourceDir: str="original_dataset", 
-                 outputDir: str="split_dataset",
-                 testSize: float=0.2,
-                 maxImages: Optional[int]=None,
-                 cropSize: Optional[tuple]=None):
+def splitDataset(
+    sourceDir: str = "original_dataset",
+    outputDir: str = "split_dataset",
+    testSize: float = 0.2,
+    maxImages: Optional[int] = None,
+    cropSize: Optional[tuple] = None,
+    randomState: Optional[int] = None,
+):
 
     imageFiles = getValidImagePaths(sourceDir, cropSize) 
     if maxImages is not None and len(imageFiles) > maxImages:
         imageFiles = imageFiles[:maxImages]
 
-    trainFiles, testFiles = train_test_split(imageFiles,
-                                             test_size=testSize,
-                                             random_state=0)
+    trainFiles, testFiles = train_test_split(
+        imageFiles, test_size=testSize, random_state=randomState
+    )
 
     outputPath = Path(outputDir)
     sourcePath = Path(sourceDir)
@@ -58,10 +61,14 @@ def splitDataset(sourceDir: str="original_dataset",
             dst = destPath / file
             processAndSaveImage(src, dst, cropSize)
 
-    print(f"Dataset split completed: {len(trainFiles)} train, {len(testFiles)} test images")
+    print(
+        f"Dataset split completed: {len(trainFiles)} train, "
+        f"{len(testFiles)} test images"
+    )
+
     if cropSize:
         print(f"All images center-cropped to {cropSize}")
 
 
 if __name__ == "__main__":
-    splitDataset(maxImages=None, cropSize=(128, 128))
+    splitDataset(maxImages=None, cropSize=(128, 128), randomState=42)

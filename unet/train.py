@@ -5,6 +5,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import piq 
+import random
+import numpy as np
 from tqdm import tqdm
 
 from model import UNet
@@ -21,6 +23,7 @@ from plots import (
 
 class ModelTrainer:
     def __init__(self):
+
         self.outputDir = self.setupOutputDirectory()
         self.logger = setupLogger(self.outputDir)
         self.logger.info(f"Saving results to: {self.outputDir}")
@@ -31,6 +34,8 @@ class ModelTrainer:
             self.checkpointManager = CheckpointManager(self.config.checkpointDir)
             self.logger.info(f"Checkpoints directory: {self.checkpointManager.checkpointDir}/")
 
+        if self.config.fixSeed:
+            self.setRandomSeed(self.config.seed)
 
         self.model = UNet().to(self.config.device)
         self.criterion = self.initLossFunction()
@@ -41,6 +46,14 @@ class ModelTrainer:
 
         self.initDataloaders()
         self.initMetrics()
+
+    def setRandomSeed(self, seed):
+        self.logger.info(f"Setting random seed to {seed}")
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
 
     def initMetrics(self):
         self.metrics = {

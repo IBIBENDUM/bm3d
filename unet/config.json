@@ -10,5 +10,8 @@
     "epochs": 100,
     "device": "cuda",
     "enableCheckpoints": true,
-    "checkpointInterval": 5
+    "checkpointInterval": 5,
+
+    "fixSeed": true,
+    "seed": 42
 }
