@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from model import UNet
 from checkpoint_manager import CheckpointManager
-from config_manager import ConfigManager
+from config_manager import Config
 from dataloader import getDataLoader
 from logger import setupLogger
 from plots import plotAndSaveExamples, plotAndSaveData, saveDataToCSV
@@ -25,7 +25,7 @@ class ModelTrainer:
         self.logger = setupLogger(self.outputDir)
         self.logger.info(f"Saving results to: {self.outputDir}")
 
-        self.config = ConfigManager().config
+        self.config = Config()
         self.logger.info(f"Used config: {self.config}")
 
         self.setupModel()
@@ -50,6 +50,15 @@ class ModelTrainer:
         self.criterion = self.setupLossFunction()
         self.optimizer = optim.Adam(
             self.model.parameters(), lr=self.config.learningRate
+        )
+        self.scheduler = self.setupLrScheduler()
+
+    def setupLrScheduler(self):
+        """Initialize learning rate scheduler"""
+        return optim.lr_scheduler.StepLR(
+            self.optimizer,
+            step_size=self.config.scheduler.get("stepsize", 30),
+            gamma=self.config.scheduler.get("gamma", 0.1),
         )
 
     def setupRandomSeed(self):
