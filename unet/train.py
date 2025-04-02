@@ -14,65 +14,50 @@ from checkpoint_manager import CheckpointManager
 from config_manager import ConfigManager
 from dataloader import getDataLoader
 from logger import setupLogger
-from plots import (
-    plotAndSaveExamples,
-    plotAndSaveData,
-    saveDataToCSV,
-)
+from plots import plotAndSaveExamples, plotAndSaveData, saveDataToCSV
 
 
 class ModelTrainer:
-    def __init__(self):
+    metricsNames = ["loss", "psnrDiff", "psnr", "ssim", "vif", "fsim"]
 
+    def __init__(self):
         self.outputDir = self.setupOutputDirectory()
         self.logger = setupLogger(self.outputDir)
         self.logger.info(f"Saving results to: {self.outputDir}")
 
         self.config = ConfigManager().config
         self.logger.info(f"Used config: {self.config}")
-        if self.config.enableCheckpoints:
-            self.checkpointManager = CheckpointManager(self.config.checkpointDir)
-            self.logger.info(f"Checkpoints directory: {self.checkpointManager.checkpointDir}/")
 
-        if self.config.fixSeed:
-            self.setRandomSeed(self.config.seed)
+        self.setupCheckpoints()
+        self.setupRandomSeed()
 
         self.model = UNet().to(self.config.device)
         self.criterion = self.initLossFunction()
         self.optimizer = optim.Adam(
-            self.model.parameters(), 
-            lr=self.config.learningRate
+            self.model.parameters(), lr=self.config.learningRate
         )
 
-        self.initDataloaders()
-        self.initMetrics()
+        self.trainLoader, self.valLoader = self.initDataloaders()
+        self.metrics = self.initMetrics()
 
-    def setRandomSeed(self, seed):
-        self.logger.info(f"Setting random seed to {seed}")
-        random.seed(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
+    def setupCheckpoints(self):
+        if self.config.enableCheckpoints:
+            self.checkpointManager = CheckpointManager(self.config.checkpointDir)
+            self.logger.info(f"Checkpoints directory: {self.checkpointManager.checkpointDir}/")
+
+    def setupRandomSeed(self):
+        if self.config.fixSeed:
+            self.logger.info(f"Setting random seed to {self.config.seed}")
+            random.seed(self.config.seed)
+            np.random.seed(self.config.seed)
+            torch.manual_seed(self.config.seed)
+            torch.cuda.manual_seed(self.config.seed)
+            torch.cuda.manual_seed_all(self.config.seed)
 
     def initMetrics(self):
-        self.metrics = {
-            "train": {
-                "loss": [],
-                "psnrDiff": [],
-                "psnr": [],
-                "ssim": [],
-                "vif": [],
-                "fsim": [],
-            },
-            "val": {
-                "loss": [],
-                "psnrDiff": [],
-                "psnr": [],
-                "ssim": [],
-                "vif": [],
-                "fsim": [],
-            },
+        return {
+            phase: {metric: [] for metric in self.metricsNames}
+            for phase in ["train", "val"]
         }
 
     def calculateBatchMetrics(self, noisy, clean, outputs):
@@ -84,7 +69,7 @@ class ModelTrainer:
         return {
             "psnrDiff": (denoisedPsnr - noisyPsnr).item(),
             "psnr": denoisedPsnr.item(),
-            "ssim": piq.ssim(outputs, clean).item(),
+            "ssim": piq.ssim(outputs, clean)[0].item(),
             "vif": piq.vif_p(outputs, clean).item(),
             "fsim": piq.fsim(outputs, clean).item(),
         }
@@ -111,7 +96,7 @@ class ModelTrainer:
 
 
     def initDataloaders(self):
-        self.trainLoader = getDataLoader(
+        trainLoader = getDataLoader(
             sourceDir=self.config.cleanTrainDir,
             batchSize=self.config.batchSize,
             numWorkers=self.config.numWorkers,
@@ -119,7 +104,7 @@ class ModelTrainer:
             shuffle=True,
         )
 
-        self.valLoader = getDataLoader(
+        valLoader = getDataLoader(
             sourceDir=self.config.cleanValDir,
             batchSize=self.config.batchSize,
             numWorkers=self.config.numWorkers,
@@ -127,19 +112,21 @@ class ModelTrainer:
             shuffle=False,
         )
 
+        return trainLoader, valLoader
+
     def runEpoch(self, dataLoader, isTraining):
         if isTraining:
             self.model.train()
+            phase = "train"
             desc = "Training"
-            mode = torch.set_grad_enabled(True)
+            mode = torch.enable_grad()
         else:
             self.model.eval()
+            phase = "val"
             desc = "Validating"
             mode = torch.inference_mode()
 
-        epochMetrics = {
-            k: 0.0 for k in ["loss", "psnr_imp", "psnr", "ssim", "vif", "fsim"]
-        }
+        epochMetrics = {metric: 0.0 for metric in self.metricsNames}
 
         with mode:
             for noisy, clean in tqdm(dataLoader, desc=desc):
@@ -154,15 +141,16 @@ class ModelTrainer:
                     self.optimizer.step()
 
                 batchMetrics = self.calculateBatchMetrics(noisy, clean, outputs)
+                batchMetrics["loss"] = loss.item()
 
-                for k in epochMetrics:
-                    epochMetrics[k] += batchMetrics[k] * noisy.size(0)
+                for metric in epochMetrics:
+                    epochMetrics[metric] += batchMetrics[metric] * noisy.size(0)
 
         epochMetrics = {k: v / len(dataLoader.dataset) for k, v in epochMetrics.items()}
-        phaseMetrics = self.metrics["train" if isTraining else "val"]
-        for k in epochMetrics:
-            phaseMetrics[k].append(epochMetrics[k])
 
+        for metric in epochMetrics:
+            self.metrics[phase][metric].append(epochMetrics[metric])
+        
         return epochMetrics
 
     def evaluateModel(self, epoch):
@@ -181,14 +169,13 @@ class ModelTrainer:
             )
 
 
-    def saveResults(self):
-        modelSavePath = self.outputDir / "denoising_model.pth"
-        torch.save(self.model.state_dict(), modelSavePath)
-        
-        for metric in self.metrics["train"].keys():
+    def saveMetrics(self):
+        for metric in self.metricsNames:
+            trainValues = self.metrics["train"][metric]
+            valValues =  self.metrics["val"][metric]
+
             plotAndSaveData(
-                yValues=[self.metrics["train"][metric],
-                         self.metrics["val"][metric]],
+                yValues=[trainValues, valValues],
                 labels=[f"Train {metric}", f"Validation {metric}"],
                 yLabel=metric,
                 xLabel="Epoch",
@@ -200,9 +187,7 @@ class ModelTrainer:
             saveDataToCSV(
                 data=[
                     (epoch + 1, train, val)
-                    for epoch, (train, val) in enumerate(
-                        zip(self.metrics["train"][metric], self.metrics["val"][metric])
-                    )
+                    for epoch, (train, val) in enumerate(zip(trainValues, valValues))
                 ],
                 headers=["epoch", f"train_{metric}", f"val_{metric}"],
                 outputDir=str(self.outputDir),
@@ -210,6 +195,13 @@ class ModelTrainer:
             )
 
         self.logger.info(f"All raw metrics saved to {self.outputDir}")
+
+
+    def saveResults(self):
+        modelSavePath = self.outputDir / "denoising_model.pth"
+        torch.save(self.model.state_dict(), modelSavePath)
+        self.logger.info(f"Model weights saved to {str(modelSavePath)}")
+        self.saveMetrics()
 
 
     def loadCheckpoint(self):
@@ -229,35 +221,39 @@ class ModelTrainer:
             self.logger.error(f"Error loading checkpoint: {str(e)}")
             return 0
 
+    def saveCheckpoint(self, epoch):
+        if not self.config.enableCheckpoints:
+            return
+
+        self.logger.debug(f"Saving checkpoint at epoch {epoch+1}")
+        self.checkpointManager.save(
+            model=self.model,
+            optimizer=self.optimizer,
+            epoch=epoch,
+            metrics=self.metrics,
+        )
+
 
     def train(self):
         startEpoch = self.loadCheckpoint() if self.config.enableCheckpoints else 0
 
-        for epoch in range(startEpoch, self.config["epochs"]):
-            self.logger.info(f"\nEpoch {epoch+1}/{self.config['epochs']}")
+        for epoch in range(startEpoch, self.config.epochs):
+            self.logger.info(f"\nEpoch {epoch+1}/{self.config.epochs}")
             
-            self.runEpoch(self.trainLoader, isTraining=True)
-            self.runEpoch(self.valLoader, isTraining=False)
+            trainMetrics = self.runEpoch(self.trainLoader, isTraining=True)
+            valMetrics =self.runEpoch(self.valLoader, isTraining=False)
             
-            for metric in self.metrics["train"].keys():
-                self.logger.info(f"{metric}: {self.metrics["train"][metric]:.4f} (train) | "
-                                 f" {self.metrics["val"][metric]:.4f} (val)")
+            for metric in self.metricsNames:
+                self.logger.info(f"{metric}: {trainMetrics[metric]:.4f} (train) | "
+                                 f" {valMetrics[metric]:.4f} (val)")
 
             if (epoch + 1) % self.config.checkpointInterval == 0:
+                self.saveCheckpoint(epoch)
                 self.evaluateModel(epoch)
                 self.saveResults()
-                if self.config.enableCheckpoints:
-                    self.logger.debug(f"Saving checkpoint at epoch {epoch+1}")
-                    self.checkpointManager.save(
-                        model=self.model,
-                        optimizer=self.optimizer,
-                        epoch=epoch,
-                        metrics=self.metrics,
-                    )
 
         self.logger.info(f"Final model and plots saved to {self.outputDir}")
         self.saveResults()
-
 
 if __name__ == "__main__":
     trainer = ModelTrainer()
