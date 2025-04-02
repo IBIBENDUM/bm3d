@@ -18,7 +18,7 @@ from plots import plotAndSaveExamples, plotAndSaveData, saveDataToCSV
 
 
 class ModelTrainer:
-    metricsNames = ["loss", "psnrDiff", "psnr", "ssim", "vif", "fsim"]
+    metricsNames = ["loss", "psnrDiff", "psnr", "ssim", "vif"]
 
     def __init__(self):
         self.outputDir = self.setupOutputDirectory()
@@ -91,7 +91,7 @@ class ModelTrainer:
             case "ssim":
                 return piq.SSIMLoss()
             case _:
-                raise ValueError(f"Unknown loss function: {self.config.optimizer["loss"]}")
+                raise ValueError(f"Unknown loss function: {self.config.optimizer['loss']}")
 
     def setupOutputDirectory(self):
         """Initialize output directory"""
@@ -147,9 +147,8 @@ class ModelTrainer:
         return {
             "psnrDiff": (denoisedPsnr - noisyPsnr).item(),
             "psnr": denoisedPsnr.item(),
-            "ssim": piq.ssim(outputs, clean)[0].item(),
+            "ssim": piq.ssim(outputs, clean).item(),
             "vif": piq.vif_p(outputs, clean).item(),
-            "fsim": piq.fsim(outputs, clean).item(),
         }
 
     def saveMetrics(self):
@@ -190,7 +189,7 @@ class ModelTrainer:
             self.model = checkpointData["model"]
             self.optimizer = checkpointData["optimizer"]
             self.metrics = checkpointData["metrics"]
-            self.logger.info(f"Resuming from epoch {checkpointData["epoch"] + 1}")
+            self.logger.info(f"Resuming from epoch {checkpointData['epoch'] + 1}")
             return checkpointData["epoch"] + 1
 
         except FileNotFoundError:
@@ -234,8 +233,12 @@ class ModelTrainer:
         """Main training loop"""
         startEpoch = self.loadCheckpoint()
 
+        # Get initial learning rate
+        current_lr = self.optimizer.param_groups[0]['lr']
+        self.logger.info(f"Initial learning rate: {current_lr:.2e}")
+
         for epoch in range(startEpoch, self.config.train["epochs"]):
-            self.logger.info(f"\nEpoch {epoch+1}/{self.config.train["epochs"]}")
+            self.logger.info(f"\nEpoch {epoch+1}/{self.config.train['epochs']}")
             
             # Training stage
             trainMetrics = self.runEpoch(self.trainLoader, isTraining=True)
@@ -245,13 +248,21 @@ class ModelTrainer:
             valMetrics =self.runEpoch(self.valLoader, isTraining=False)
             self.updateMetrics("val", valMetrics)
             
+            # Step the scheduler and log LR changes
+            old_lr = current_lr
+            self.scheduler.step()
+            current_lr = self.optimizer.param_groups[0]['lr']
+            
+            if current_lr != old_lr:
+                self.logger.info(f"Learning rate changed from {old_lr:.2e} to {current_lr:.2e}")
+            
             # Log metrics
             for metric in self.metricsNames:
-                self.logger.info(f"{metric}: {trainMetrics[metric]:.4f} (train) | "
-                                 f" {valMetrics[metric]:.4f} (val)")
+                self.logger.info(f"{metric}: {trainMetrics[metric]:.6f} (train) | "
+                                 f" {valMetrics[metric]:.6f} (val)")
 
             # Periodic save data
-            if self.shouldSaveCheckpoint:
+            if self.shouldSaveCheckpoint(epoch):
                 self.saveCheckpoint(epoch)
                 self.evaluateModel(epoch)
                 self.saveResults()
