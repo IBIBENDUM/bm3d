@@ -28,24 +28,32 @@ class ModelTrainer:
         self.config = ConfigManager().config
         self.logger.info(f"Used config: {self.config}")
 
+        self.setupModel()
+
+        self.trainLoader, self.valLoader = self.setupDataloaders()
+        self.metrics = self.setupMetricsStorage()
+
+    def setupCheckpoints(self):
+        """Initialize checkpoint manager if enabled"""
+        if self.config.enableCheckpoints:
+            self.checkpointManager = CheckpointManager(self.config.checkpointDir)
+            self.logger.info(
+                f"Checkpoints directory: {self.checkpointManager.checkpointDir}/"
+            )
+
+    def setupModel(self):
+        """Initialize model, loss, optimizer and checkpoint manager"""
         self.setupCheckpoints()
         self.setupRandomSeed()
 
         self.model = UNet().to(self.config.device)
-        self.criterion = self.initLossFunction()
+        self.criterion = self.setupLossFunction()
         self.optimizer = optim.Adam(
             self.model.parameters(), lr=self.config.learningRate
         )
 
-        self.trainLoader, self.valLoader = self.initDataloaders()
-        self.metrics = self.initMetrics()
-
-    def setupCheckpoints(self):
-        if self.config.enableCheckpoints:
-            self.checkpointManager = CheckpointManager(self.config.checkpointDir)
-            self.logger.info(f"Checkpoints directory: {self.checkpointManager.checkpointDir}/")
-
     def setupRandomSeed(self):
+        """Set random seed if enabled"""
         if self.config.fixSeed:
             self.logger.info(f"Setting random seed to {self.config.seed}")
             random.seed(self.config.seed)
@@ -54,27 +62,16 @@ class ModelTrainer:
             torch.cuda.manual_seed(self.config.seed)
             torch.cuda.manual_seed_all(self.config.seed)
 
-    def initMetrics(self):
+    def setupMetricsStorage(self):
+        """Initialize metrics storage structure"""
         return {
             phase: {metric: [] for metric in self.metricsNames}
             for phase in ["train", "val"]
         }
 
-    def calculateBatchMetrics(self, noisy, clean, outputs):
-        outputs = (outputs - outputs.min()) / (outputs.max() - outputs.min())
 
-        noisyPsnr = piq.psnr(noisy, clean)
-        denoisedPsnr = piq.psnr(outputs, clean)
-
-        return {
-            "psnrDiff": (denoisedPsnr - noisyPsnr).item(),
-            "psnr": denoisedPsnr.item(),
-            "ssim": piq.ssim(outputs, clean)[0].item(),
-            "vif": piq.vif_p(outputs, clean).item(),
-            "fsim": piq.fsim(outputs, clean).item(),
-        }
-
-    def initLossFunction(self):
+    def setupLossFunction(self):
+        """Initialize loss function based on config"""
         match self.config.loss.lower():
             case "l1" | "mae":
                 return nn.L1Loss()
@@ -88,14 +85,15 @@ class ModelTrainer:
                 raise ValueError(f"Unknown loss function: {self.config.loss}")
 
     def setupOutputDirectory(self):
+        """Initialize output directory"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         outputDir = Path("results") / f"run_{timestamp}"
         outputDir.mkdir(parents=True, exist_ok=True)
 
         return outputDir
 
-
-    def initDataloaders(self):
+    def setupDataloaders(self):
+        """Initialize data loaders for training and validation"""
         trainLoader = getDataLoader(
             sourceDir=self.config.cleanTrainDir,
             batchSize=self.config.batchSize,
@@ -114,46 +112,8 @@ class ModelTrainer:
 
         return trainLoader, valLoader
 
-    def runEpoch(self, dataLoader, isTraining):
-        if isTraining:
-            self.model.train()
-            phase = "train"
-            desc = "Training"
-            mode = torch.enable_grad()
-        else:
-            self.model.eval()
-            phase = "val"
-            desc = "Validating"
-            mode = torch.inference_mode()
-
-        epochMetrics = {metric: 0.0 for metric in self.metricsNames}
-
-        with mode:
-            for noisy, clean in tqdm(dataLoader, desc=desc):
-                noisy = noisy.to(self.config.device)
-                clean = clean.to(self.config.device)
-                outputs = self.model(noisy)
-                loss = self.criterion(outputs, clean)
-
-                if isTraining:
-                    self.optimizer.zero_grad()
-                    loss.backward()
-                    self.optimizer.step()
-
-                batchMetrics = self.calculateBatchMetrics(noisy, clean, outputs)
-                batchMetrics["loss"] = loss.item()
-
-                for metric in epochMetrics:
-                    epochMetrics[metric] += batchMetrics[metric] * noisy.size(0)
-
-        epochMetrics = {k: v / len(dataLoader.dataset) for k, v in epochMetrics.items()}
-
-        for metric in epochMetrics:
-            self.metrics[phase][metric].append(epochMetrics[metric])
-        
-        return epochMetrics
-
     def evaluateModel(self, epoch):
+        """Save example predictions"""
         sampleNoisy, sampleClean = next(iter(self.valLoader))
         sampleNoisy = sampleNoisy.to(self.config.device)
         sampleClean = sampleClean.to(self.config.device)
@@ -168,8 +128,23 @@ class ModelTrainer:
                 str(self.outputDir)
             )
 
+    def calculateBatchMetrics(self, noisy, clean, outputs):
+        """Calculate metrics for single batch"""
+        outputs = (outputs - outputs.min()) / (outputs.max() - outputs.min())
+
+        noisyPsnr = piq.psnr(noisy, clean)
+        denoisedPsnr = piq.psnr(outputs, clean)
+
+        return {
+            "psnrDiff": (denoisedPsnr - noisyPsnr).item(),
+            "psnr": denoisedPsnr.item(),
+            "ssim": piq.ssim(outputs, clean)[0].item(),
+            "vif": piq.vif_p(outputs, clean).item(),
+            "fsim": piq.fsim(outputs, clean).item(),
+        }
 
     def saveMetrics(self):
+        """Save metrics to csv files and plots"""
         for metric in self.metricsNames:
             trainValues = self.metrics["train"][metric]
             valValues =  self.metrics["val"][metric]
@@ -196,15 +171,11 @@ class ModelTrainer:
 
         self.logger.info(f"All raw metrics saved to {self.outputDir}")
 
-
-    def saveResults(self):
-        modelSavePath = self.outputDir / "denoising_model.pth"
-        torch.save(self.model.state_dict(), modelSavePath)
-        self.logger.info(f"Model weights saved to {str(modelSavePath)}")
-        self.saveMetrics()
-
-
     def loadCheckpoint(self):
+        """Load checkpoint if enabled and available"""
+        if not self.config.enableCheckpoints:
+            return 0
+
         try:
             checkpointData = self.checkpointManager.load(self.model, self.optimizer)
             self.model = checkpointData["model"]
@@ -222,6 +193,7 @@ class ModelTrainer:
             return 0
 
     def saveCheckpoint(self, epoch):
+        """Save checkpoint"""
         if not self.config.enableCheckpoints:
             return
 
@@ -233,27 +205,87 @@ class ModelTrainer:
             metrics=self.metrics,
         )
 
+    def shouldSaveCheckpoint(self, epoch):
+        """Check if should save checkpoint"""
+        return (epoch + 1) % self.config.checkpointInterval == 0
+
+    def saveResults(self):
+        """Save model weights and metrics"""
+        modelSavePath = self.outputDir / "denoising_model.pth"
+        torch.save(self.model.state_dict(), modelSavePath)
+        self.logger.info(f"Model weights saved to {str(modelSavePath)}")
+        self.saveMetrics()
+
+    def updateMetrics(self, stage, epochMetrics):
+        """Update metrics storage with new epoch results"""
+        for metric in epochMetrics:
+            self.metrics[stage][metric].append(epochMetrics[metric])
 
     def train(self):
-        startEpoch = self.loadCheckpoint() if self.config.enableCheckpoints else 0
+        """Main training loop"""
+        startEpoch = self.loadCheckpoint()
 
         for epoch in range(startEpoch, self.config.epochs):
             self.logger.info(f"\nEpoch {epoch+1}/{self.config.epochs}")
             
+            # Training stage
             trainMetrics = self.runEpoch(self.trainLoader, isTraining=True)
+            self.updateMetrics("train", trainMetrics)
+
+            # Validation stage
             valMetrics =self.runEpoch(self.valLoader, isTraining=False)
+            self.updateMetrics("val", valMetrics)
             
+            # Log metrics
             for metric in self.metricsNames:
                 self.logger.info(f"{metric}: {trainMetrics[metric]:.4f} (train) | "
                                  f" {valMetrics[metric]:.4f} (val)")
 
-            if (epoch + 1) % self.config.checkpointInterval == 0:
+            # Periodic save data
+            if self.shouldSaveCheckpoint:
                 self.saveCheckpoint(epoch)
                 self.evaluateModel(epoch)
                 self.saveResults()
 
+        # Final save
         self.logger.info(f"Final model and plots saved to {self.outputDir}")
         self.saveResults()
+
+    def runEpoch(self, dataLoader, isTraining):
+        """Run training or validation epoch"""
+        if isTraining:
+            self.model.train()
+            desc = "Training"
+            mode = torch.enable_grad()
+        else:
+            self.model.eval()
+            desc = "Validating"
+            mode = torch.inference_mode()
+
+        epochMetrics = {metric: 0.0 for metric in self.metricsNames}
+
+        with mode:
+            for noisy, clean in tqdm(dataLoader, desc=desc):
+                noisy = noisy.to(self.config.device)
+                clean = clean.to(self.config.device)
+                outputs = self.model(noisy)
+                loss = self.criterion(outputs, clean)
+
+                if isTraining:
+                    self.optimizer.zero_grad()
+                    loss.backward()
+                    self.optimizer.step()
+
+                batchMetrics = self.calculateBatchMetrics(noisy, clean, outputs)
+                batchMetrics["loss"] = loss.item()
+
+                for metric in epochMetrics:
+                    epochMetrics[metric] += batchMetrics[metric] * noisy.size(0)
+
+        epochMetrics = {k: v / len(dataLoader.dataset) for k, v in epochMetrics.items()}
+        
+        return epochMetrics
+
 
 if __name__ == "__main__":
     trainer = ModelTrainer()
