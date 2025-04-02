@@ -19,9 +19,9 @@ def plotAndSaveExamples(
 
     setGraphStyle()
 
-    noisy = noisy[:numExamples].cpu().clamp(0, 1)
-    denoised = denoised[:numExamples].cpu().clamp(0, 1)
-    clean = clean[:numExamples].cpu().clamp(0, 1)
+    noisy = noisy[:numExamples].detach().cpu().clamp(0, 1)
+    denoised = denoised[:numExamples].detach().cpu().clamp(0, 1)
+    clean = clean[:numExamples].detach().cpu().clamp(0, 1)
     
     plt.figure(figsize=(15, 5))
     
@@ -67,31 +67,6 @@ def plotAndSaveData(yValues, labels, yLabel, xLabel, title, outputDir, filename)
     plt.savefig(filePath)
     plt.close()
 
-
-def plotLosses(trainLosses, valLosses, outputDir="results"):
-    plotAndSaveData(
-        yValues=[trainLosses, valLosses],
-        labels=["Train Loss", "Validation Loss"],
-        yLabel="Loss",
-        xLabel="Epoch",
-        title="Training and Validation Loss",
-        outputDir=outputDir,
-        filename="lossesPlot.png",
-    )
-
-
-def plotPsnrImprovements(trainImps, valImps, outputDir="results"):
-    plotAndSaveData(
-        yValues=[trainImps, valImps],
-        labels=["Train PSNR Improvement", "Validation PSNR Improvement"],
-        yLabel="PSNR Improvement (dB)",
-        xLabel="Epoch",
-        title="Denoising Quality Improvement",
-        outputDir=outputDir,
-        filename="psnr_improvements.png",
-    )
-
-
 def saveDataToCSV(data, headers, outputDir, filename):
     outputPath = Path(outputDir)
     outputPath.mkdir(parents=True, exist_ok=True)
@@ -105,22 +80,3 @@ def saveDataToCSV(data, headers, outputDir, filename):
         for row in data:
             writer.writerow(row)
 
-
-def saveLossesToCSV(trainLosses, valLosses, outputDir="results"):
-    data = [
-        (epoch + 1, trainLoss, valLoss)
-        for epoch, (trainLoss, valLoss) in enumerate(zip(trainLosses, valLosses))
-    ]
-    headers = ["Epoch", "Train Loss", "Val Loss"]
-
-    saveDataToCSV(data, headers, outputDir, "lossesTable.csv")
-
-
-def savePsnrImprovementsToCSV(trainImps, valImps, outputDir="results"):
-    data = [
-        (epoch + 1, trainImp, valImp)
-        for epoch, (trainImp, valImp) in enumerate(zip(trainImps, valImps))
-    ]
-    headers = ["Epoch", "Train PSNR Improvement", "Val PSNR Improvement"]
-
-    saveDataToCSV(data, headers, outputDir, "psnrImprovementsTable.csv")
