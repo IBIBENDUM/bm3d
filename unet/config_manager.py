@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 import torch
 from dataclasses import dataclass, field
 from typing import Any, Dict
@@ -19,26 +20,13 @@ class Config:
         self.optimizer.update(data.get("optimizer", {}))
         self.checkpoints.update(data.get("checkpoints", {}))
         self.random.update(data.get("random", {}))
-        self.extra.update(
-            {
-                k: v
-                for k, v in data.items()
-                if k not in {"paths", "train", "optimizer", "checkpoints", "random"}
-            }
-        )
+        self.extra.update({k: v for k, v in data.items() if k not in {"paths", "train", "optimizer", "checkpoints", "random"}})
 
         if self.device == "cuda" and not torch.cuda.is_available():
             self.train["device"] = "cpu"
 
     def __getattr__(self, key):
-        for section in (
-            self.paths,
-            self.train,
-            self.optimizer,
-            self.checkpoints,
-            self.random,
-            self.extra,
-        ):
+        for section in (self.paths, self.train, self.optimizer, self.checkpoints, self.random, self.extra):
             if key in section:
                 return section[key]
         raise AttributeError(f"Config has no attribute '{key}'")
@@ -48,3 +36,23 @@ class Config:
         with open(config_path, "r") as file:
             return json.load(file)
 
+    def __repr__(self):
+        # Генерация красивого вывода, как в JSON
+        return json.dumps(self.to_dict(), indent=4)
+
+    def to_dict(self):
+        # Преобразование в словарь с игнорированием атрибутов класса
+        return {
+            "paths": self.paths,
+            "train": self.train,
+            "optimizer": self.optimizer,
+            "checkpoints": self.checkpoints,
+            "random": self.random,
+            "extra": self.extra
+        }
+
+# Автоматическая загрузка конфига при создании объекта
+config = Config()
+
+# Вывод объекта
+print(config)

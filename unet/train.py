@@ -35,8 +35,8 @@ class ModelTrainer:
 
     def setupCheckpoints(self):
         """Initialize checkpoint manager if enabled"""
-        if self.config.enableCheckpoints:
-            self.checkpointManager = CheckpointManager(self.config.checkpointDir)
+        if self.config.checkpoints["enableCheckpoints"]:
+            self.checkpointManager = CheckpointManager(self.config.paths["checkpointDir"])
             self.logger.info(
                 f"Checkpoints directory: {self.checkpointManager.checkpointDir}/"
             )
@@ -46,10 +46,10 @@ class ModelTrainer:
         self.setupCheckpoints()
         self.setupRandomSeed()
 
-        self.model = UNet().to(self.config.device)
+        self.model = UNet().to(self.config.train["device"])
         self.criterion = self.setupLossFunction()
         self.optimizer = optim.Adam(
-            self.model.parameters(), lr=self.config.learningRate
+            self.model.parameters(), lr=self.config.optimizer["learningRate"]
         )
         self.scheduler = self.setupLrScheduler()
 
@@ -57,19 +57,19 @@ class ModelTrainer:
         """Initialize learning rate scheduler"""
         return optim.lr_scheduler.StepLR(
             self.optimizer,
-            step_size=self.config.scheduler.get("stepsize", 30),
-            gamma=self.config.scheduler.get("gamma", 0.1),
+            step_size=self.config.optimizer["scheduler"]["stepsize"],
+            gamma=self.config.optimizer["scheduler"]["gamma"],
         )
 
     def setupRandomSeed(self):
         """Set random seed if enabled"""
-        if self.config.fixSeed:
-            self.logger.info(f"Setting random seed to {self.config.seed}")
-            random.seed(self.config.seed)
-            np.random.seed(self.config.seed)
-            torch.manual_seed(self.config.seed)
-            torch.cuda.manual_seed(self.config.seed)
-            torch.cuda.manual_seed_all(self.config.seed)
+        if self.config.random["fixSeed"]:
+            self.logger.info(f"Setting random seed to {self.config.random["seed"]}")
+            random.seed(self.config.random["seed"])
+            np.random.seed(self.config.random["seed"])
+            torch.manual_seed(self.config.random["seed"])
+            torch.cuda.manual_seed(self.config.random["seed"])
+            torch.cuda.manual_seed_all(self.config.random["seed"])
 
     def setupMetricsStorage(self):
         """Initialize metrics storage structure"""
@@ -81,7 +81,7 @@ class ModelTrainer:
 
     def setupLossFunction(self):
         """Initialize loss function based on config"""
-        match self.config.loss.lower():
+        match self.config.optimizer["loss"].lower():
             case "l1" | "mae":
                 return nn.L1Loss()
             case "l2" | "mse":
@@ -91,7 +91,7 @@ class ModelTrainer:
             case "ssim":
                 return piq.SSIMLoss()
             case _:
-                raise ValueError(f"Unknown loss function: {self.config.loss}")
+                raise ValueError(f"Unknown loss function: {self.config.optimizer["loss"]}")
 
     def setupOutputDirectory(self):
         """Initialize output directory"""
@@ -104,17 +104,17 @@ class ModelTrainer:
     def setupDataloaders(self):
         """Initialize data loaders for training and validation"""
         trainLoader = getDataLoader(
-            sourceDir=self.config.cleanTrainDir,
-            batchSize=self.config.batchSize,
-            numWorkers=self.config.numWorkers,
+            sourceDir=self.config.paths["cleanTrainDir"],
+            batchSize=self.config.train["batchSize"],
+            numWorkers=self.config.train["numWorkers"],
             augment=True,
             shuffle=True,
         )
 
         valLoader = getDataLoader(
-            sourceDir=self.config.cleanValDir,
-            batchSize=self.config.batchSize,
-            numWorkers=self.config.numWorkers,
+            sourceDir=self.config.paths["cleanValDir"],
+            batchSize=self.config.train["batchSize"],
+            numWorkers=self.config.train["numWorkers"],
             augment=False,
             shuffle=False,
         )
@@ -124,8 +124,8 @@ class ModelTrainer:
     def evaluateModel(self, epoch):
         """Save example predictions"""
         sampleNoisy, sampleClean = next(iter(self.valLoader))
-        sampleNoisy = sampleNoisy.to(self.config.device)
-        sampleClean = sampleClean.to(self.config.device)
+        sampleNoisy = sampleNoisy.to(self.config.train["device"])
+        sampleClean = sampleClean.to(self.config.train["device"])
         
         with torch.inference_mode():
             sampleDenoised = self.model(sampleNoisy)
@@ -182,7 +182,7 @@ class ModelTrainer:
 
     def loadCheckpoint(self):
         """Load checkpoint if enabled and available"""
-        if not self.config.enableCheckpoints:
+        if not self.config.checkpoints["enableCheckpoints"]:
             return 0
 
         try:
@@ -203,7 +203,7 @@ class ModelTrainer:
 
     def saveCheckpoint(self, epoch):
         """Save checkpoint"""
-        if not self.config.enableCheckpoints:
+        if not self.config.checkpoints["enableCheckpoints"]:
             return
 
         self.logger.debug(f"Saving checkpoint at epoch {epoch+1}")
@@ -216,7 +216,7 @@ class ModelTrainer:
 
     def shouldSaveCheckpoint(self, epoch):
         """Check if should save checkpoint"""
-        return (epoch + 1) % self.config.checkpointInterval == 0
+        return (epoch + 1) % self.config.checkpoints["checkpointInterval"] == 0
 
     def saveResults(self):
         """Save model weights and metrics"""
@@ -234,8 +234,8 @@ class ModelTrainer:
         """Main training loop"""
         startEpoch = self.loadCheckpoint()
 
-        for epoch in range(startEpoch, self.config.epochs):
-            self.logger.info(f"\nEpoch {epoch+1}/{self.config.epochs}")
+        for epoch in range(startEpoch, self.config.train["epochs"]):
+            self.logger.info(f"\nEpoch {epoch+1}/{self.config.train["epochs"]}")
             
             # Training stage
             trainMetrics = self.runEpoch(self.trainLoader, isTraining=True)
@@ -275,8 +275,8 @@ class ModelTrainer:
 
         with mode:
             for noisy, clean in tqdm(dataLoader, desc=desc):
-                noisy = noisy.to(self.config.device)
-                clean = clean.to(self.config.device)
+                noisy = noisy.to(self.config.train["device"])
+                clean = clean.to(self.config.train["device"])
                 outputs = self.model(noisy)
                 loss = self.criterion(outputs, clean)
 
