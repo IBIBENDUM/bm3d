@@ -17,7 +17,7 @@ class CheckpointManager:
 
     def _getFilePaths(self, fileName, epoch=1):
         mainPath = self.checkpointDir / fileName
-        backupPath = mainPath.with_suffix(f"_epoch{epoch}.bak")
+        backupPath = mainPath.with_suffix(f".epoch{epoch}.bak")
         return mainPath, backupPath
 
     def _createMetadata(self):
@@ -51,7 +51,7 @@ class CheckpointManager:
         
         try:
             checkpointPath = mainPath
-            checkpoint = torch.load(checkpointPath)
+            checkpoint = torch.load(checkpointPath, weights_only=False)
             
             model.load_state_dict(checkpoint['modelStateDict'])
             optimizer.load_state_dict(checkpoint['optimizerStateDict'])
