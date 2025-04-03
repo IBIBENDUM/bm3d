@@ -149,26 +149,25 @@ class OptunaModelTrainer(ModelTrainer):
 
     def optimize(self, nTrials=10):
         """Optimize hyperparameters using Optuna"""
-        study = optuna.create_study(direction="minimize")
-        study.optimize(self.objective, n_trials=nTrials)
+        self.study.optimize(self.objective, n_trials=nTrials)
 
-        bestTrial = study.best_trial
+        bestTrial = self.study.best_trial
         self.logger.info(f"Best trial: {bestTrial.number + 1}\n"
                          f"Value: {bestTrial.value}")
 
         self.logHyperparameters(bestTrial.number, bestTrial.params)
 
         # Save optimization results
-        self.saveOptimizationResults(study)
+        self.saveOptimizationResults()
 
-    def saveOptimizationResults(self, study):
+    def saveOptimizationResults(self):
         """Save optimization results and plots"""
         outputDir = Path("optuna_results")
         outputDir.mkdir(parents=True, exist_ok=True)
         self.logger.info(f"Output directory created: {outputDir}")
 
         historyDf = pd.DataFrame(
-            [(trial.number + 1, trial.value) for trial in study.trials],
+            [(trial.number + 1, trial.value) for trial in self.study.trials],
             columns=["Trial", "Objective"],
         )
         historyCsvPath = outputDir / "optimization_history.csv"
@@ -176,13 +175,13 @@ class OptunaModelTrainer(ModelTrainer):
         self.logger.info(f"Optimization history saved to {historyCsvPath}.")
 
         # Plot optimization history using Optuna's visualization library
-        fig = vis.plot_optimization_history(study)
+        fig = vis.plot_optimization_history(self.study)
         historyImgPath = outputDir / "optimization_history.png"
         fig.write_image(historyImgPath)
         self.logger.info(f"Optimization history plot saved to {historyImgPath}.")
 
         # Plot parameter importance
-        fig2 = vis.plot_param_importances(study)
+        fig2 = vis.plot_param_importances(self.study)
         importanceImgPath = outputDir / "param_importance.png"
         fig2.write_image(importanceImgPath)
         self.logger.info(f"Parameter importance plot saved to {importanceImgPath}.")
