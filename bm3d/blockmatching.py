@@ -95,14 +95,14 @@ def processBlock(
     searchWindow, searchWindowCoords = getSearchWindow(x, y, blocks, profile)
     indices = findSimilarBlocksIndices(refBlock, searchWindow, profile)
                
-    # Ensure even number of blocks
-    if indices.shape[0] % 2 != 0:
-        indices = indices[:-1]
-
     # Limit group size if specified
     if profile.groupMaxSize != 0:
         if indices.shape[0] > profile.groupMaxSize:
             indices = indices[:profile.groupMaxSize]
+
+    # Ensure even number of blocks
+    if indices.shape[0] % 2 != 0:
+        indices = indices[:-1]
 
     # Scale indices to get coordinates
     similarBlocksCoords = blocksCoords[(indices + searchWindowCoords)[:, 0],
@@ -170,8 +170,8 @@ def getGroupsFromCoords(
 
     groups = []
     for coords in groupsCoords:
-        indices = coords // profile.blockStep
-        group = blocks[indices[:, 0], indices[:, 1]]
+        i, j  = (coords // profile.blockStep).T
+        group = blocks[i, j]
         groups.append(group)
 
     return groups
