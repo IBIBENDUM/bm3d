@@ -139,8 +139,6 @@ class ModelTrainer:
 
     def calculateBatchMetrics(self, noisy, clean, outputs):
         """Calculate metrics for single batch"""
-        outputs = (outputs - outputs.min()) / (outputs.max() - outputs.min())
-
         noisyPsnr = piq.psnr(noisy, clean)
         denoisedPsnr = piq.psnr(outputs, clean)
 
@@ -233,10 +231,6 @@ class ModelTrainer:
         """Main training loop"""
         startEpoch = self.loadCheckpoint()
 
-        # Get initial learning rate
-        current_lr = self.optimizer.param_groups[0]['lr']
-        self.logger.info(f"Initial learning rate: {current_lr:.2e}")
-
         for epoch in range(startEpoch, self.config.train["epochs"]):
             self.logger.info(f"\nEpoch {epoch+1}/{self.config.train['epochs']}")
             
@@ -245,11 +239,11 @@ class ModelTrainer:
             self.updateMetrics("train", trainMetrics)
 
             # Validation stage
-            valMetrics =self.runEpoch(self.valLoader, isTraining=False)
+            valMetrics = self.runEpoch(self.valLoader, isTraining=False)
             self.updateMetrics("val", valMetrics)
             
             # Step the scheduler and log LR changes
-            old_lr = current_lr
+            old_lr = self.optimizer.param_groups[0]['lr']
             self.scheduler.step()
             current_lr = self.optimizer.param_groups[0]['lr']
             
