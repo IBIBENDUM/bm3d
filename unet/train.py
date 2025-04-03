@@ -64,7 +64,7 @@ class ModelTrainer:
     def setupRandomSeed(self):
         """Set random seed if enabled"""
         if self.config.random["fixSeed"]:
-            self.logger.info(f"Setting random seed to {self.config.random["seed"]}")
+            self.logger.info(f'Setting random seed to {self.config.random["seed"]}')
             random.seed(self.config.random["seed"])
             np.random.seed(self.config.random["seed"])
             torch.manual_seed(self.config.random["seed"])
