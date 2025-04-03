@@ -95,14 +95,14 @@ def processBlock(
     searchWindow, searchWindowCoords = getSearchWindow(x, y, blocks, profile)
     indices = findSimilarBlocksIndices(refBlock, searchWindow, profile)
                
-    # Ensure even number of blocks
-    if indices.shape[0] % 2 != 0:
-        indices = indices[:-1]
-
     # Limit group size if specified
     if profile.groupMaxSize != 0:
         if indices.shape[0] > profile.groupMaxSize:
             indices = indices[:profile.groupMaxSize]
+
+    # Ensure even number of blocks
+    if indices.shape[0] % 2 != 0:
+        indices = indices[:-1]
 
     # Scale indices to get coordinates
     similarBlocksCoords = blocksCoords[(indices + searchWindowCoords)[:, 0],
@@ -138,8 +138,9 @@ def findSimilarGroups(
         for x in range(blocks.shape[1])
     ]
 
+    chunkSize = max(1, blocks.shape[0] * blocks.shape[1] // (profile.cores * 16)) 
     with Pool(processes=profile.cores) as p:
-        results = p.map(processBlock, args)
+        results = p.map(processBlock, args, chunksize=chunkSize)
 
     similarBlocksCoords: List[np.ndarray] = []
     similarGroups: List[np.ndarray] = []
@@ -170,13 +171,16 @@ def getGroupsFromCoords(
 
     groups = []
     for coords in groupsCoords:
-        indices = coords // profile.blockStep
-        group = blocks[indices[:, 0], indices[:, 1]]
+        i, j  = (coords // profile.blockStep).T
+        group = blocks[i, j]
         groups.append(group)
 
     return groups
 
-def getBlocks(noisyImage: np.ndarray, profile: BM3DProfile) -> Tuple[np.ndarray, np.ndarray]:
+
+def getBlocks(
+    noisyImage: np.ndarray, profile: BM3DProfile
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Extract blocks based from image
 
@@ -192,21 +196,18 @@ def getBlocks(noisyImage: np.ndarray, profile: BM3DProfile) -> Tuple[np.ndarray,
     blockSize, blockStep = profile.blockSize, profile.blockStep
     imageHeight, imageWidth = noisyImage.shape
 
-    def computeIndices(imageLength: int) -> list:
-        blocksAmount = (imageLength - blockSize) // blockStep + 1
-        if blocksAmount > 1:
-            indices = np.linspace(0, imageLength - blockSize, blocksAmount, dtype=int).tolist()
-        else:
-            indices = [0]
-        return indices
+    def computeIndices(imageLength: int, blockSize, blockStep):
+        return np.arange(0, imageLength - blockSize + 1, blockStep, dtype=np.int64)
 
-    yIndices = computeIndices(imageHeight)
-    xIndices = computeIndices(imageWidth)
+    yIndices = computeIndices(imageHeight, blockSize, blockStep)
+    xIndices = computeIndices(imageWidth, blockSize, blockStep)
 
-    slidingBlocks = np.lib.stride_tricks.sliding_window_view(noisyImage, (blockSize, blockSize))
+    slidingBlocks = np.lib.stride_tricks.sliding_window_view(
+        noisyImage, (blockSize, blockSize)
+    )
     blocks = slidingBlocks[np.ix_(yIndices, xIndices)]
-    
+
     yCoords, xCoords = np.meshgrid(yIndices, xIndices, indexing="ij")
     coords = np.stack((yCoords, xCoords), axis=-1)
-    
+
     return blocks, coords

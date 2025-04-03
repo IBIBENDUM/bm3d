@@ -23,6 +23,7 @@ def bm3d(noisyImage: np.ndarray, noiseVariance: float,
     """
     Apply BM3D method to denoise image
     """
+    # numbaProfile = profile.to_numba_profile()
 
     # Reset task affinity so that all cores are used
     if profile.cores != 1:
@@ -43,10 +44,8 @@ def bm3dBasic(noisyImage: np.ndarray, noiseVariance: float,
     Perform basic step of the BM3D with hard-threshold filter
     """
 
+    # numbaProfile = profile.toNumbaProfile()
     blocks, blocksCoords = getBlocks(noisyImage, profile)
-    # blocks: np.ndarray = np.lib.stride_tricks.sliding_window_view(
-    #     noisyImage, (profile.blockSize, profile.blockSize)
-    #     )[:: profile.blockStep, :: profile.blockStep]
 
     groupsCoords, groups = findSimilarGroups(blocks, blocksCoords, profile)
 
@@ -66,16 +65,15 @@ def bm3dFinal(basicEstimate: np.ndarray, noisyImage: np.ndarray,
     Perform final step of the BM3D with wiener filter
     """
 
-    blocks: np.ndarray = np.lib.stride_tricks.sliding_window_view(
-        noisyImage, (profile.blockSize, profile.blockSize)
-    )[:: profile.blockStep, :: profile.blockStep]
+    # numbaProfile = profile.toNumbaProfile()
+    estimateBlocks, estimateBlocksCoords = getBlocks(basicEstimate, profile)
+    noisyBlocks, _ = getBlocks(noisyImage, profile)
 
-    groupsCoords, groupsEstimate = findSimilarGroups(basicEstimate, profile)
-    groupsImage: List[np.ndarray] = getGroupsFromCoords(noisyImage, groupsCoords,
-                                                        profile)
+    groupsCoords, estimateGroups = findSimilarGroups(estimateBlocks, estimateBlocksCoords, profile)
 
-    filteredGroups, weights = applyFilterWie(groupsEstimate, groupsImage,
-                                             noiseVariance)
+    filteredGroups, weights = applyFilterWie(
+        estimateBlocks, noisyBlocks, estimateGroups, groupsCoords, noiseVariance, profile
+    )
 
     imageEstimate = globalAgregation(noisyImage.shape, filteredGroups,
                                groupsCoords, weights, profile)

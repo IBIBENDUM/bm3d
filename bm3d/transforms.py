@@ -2,10 +2,37 @@
 Functions for applying transformations used in BM3D
 """
 
-from scipy.fftpack import dctn, idctn
+import scipy
+from scipy.fft import dctn, idctn
 from typing import List, Tuple
 import numpy as np
 import pywt
+from numba import njit, prange
+
+@njit(nogil=True, fastmath=True, cache=True)
+def dctnJIT(x, norm=None):
+    return scipy.fft.dctn(x, norm=norm)
+
+@njit(nogil=True, fastmath=True, cache=True)
+def applyToBlocks2dDctJIT(blocks: np.ndarray) -> np.ndarray:
+    """
+    Apply 2D DCT to each block in blocks array
+
+    Args:
+        blocks: array of blocks
+    
+    Return:
+        Array of transformed blocks
+    """
+    transformedBlocks = np.empty_like(blocks, dtype=np.float32)
+
+    for i in prange(blocks.shape[0]): 
+        for j in range(blocks.shape[1]):
+            block = blocks[i, j]
+            dctBlock = dctnJIT(block, norm='ortho')
+            transformedBlocks[i, j] = dctBlock
+
+    return transformedBlocks
 
 def applyToBlocks2dDct(blocks: np.ndarray) -> np.ndarray:
     """
@@ -17,7 +44,7 @@ def applyToBlocks2dDct(blocks: np.ndarray) -> np.ndarray:
     Return:
         Array of transformed blocks
     """
-    transformedBlocks = np.zeros_like(blocks, dtype=np.float32)
+    transformedBlocks = np.empty_like(blocks, dtype=np.float32)
 
     for i in range(blocks.shape[0]): 
         for j in range(blocks.shape[1]):
@@ -26,26 +53,6 @@ def applyToBlocks2dDct(blocks: np.ndarray) -> np.ndarray:
             transformedBlocks[i, j] = dctBlock
 
     return transformedBlocks
-
-def applyToGroups2DCT(groups: List[np.ndarray]) -> List[np.ndarray]:
-    """
-    Apply 2D DCT to each block in list of groups
-
-    Args:
-        groups: list of groups
-    
-    Return:
-        List of transformed groups
-    """
-
-    transformedGroups: List[np.ndarray] = []
-    for group in groups:
-        transformedGroup: np.ndarray = np.empty_like(group, dtype=np.float64)
-        for i, block in enumerate(group):
-            transformedGroup[i] = dctn(block, norm='ortho')
-        transformedGroups.append(transformedGroup)
-
-    return transformedGroups
 
 
 def applyToGroupInverse2DCT(group: np.ndarray) -> np.ndarray:
@@ -59,13 +66,7 @@ def applyToGroupInverse2DCT(group: np.ndarray) -> np.ndarray:
         List of inverse-transformed groups
     """
 
-    transformedGroup: np.ndarray = np.empty_like(group, dtype=np.float64)
-
-    for i, block in enumerate(group):
-        transformedGroup[i] = idctn(block, norm='ortho')
-
-    return transformedGroup
-
+    return np.stack([idctn(block, norm='ortho') for block in group])
 
 def applyHaar(signal: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
