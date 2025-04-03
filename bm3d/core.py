@@ -44,9 +44,8 @@ def bm3dBasic(noisyImage: np.ndarray, noiseVariance: float,
     Perform basic step of the BM3D with hard-threshold filter
     """
 
-    numbaProfile = profile.toNumbaProfile()
-    print(type(numbaProfile))
-    blocks, blocksCoords = getBlocks(noisyImage, numbaProfile.blockSize, numbaProfile.blockStep)
+    # numbaProfile = profile.toNumbaProfile()
+    blocks, blocksCoords = getBlocks(noisyImage, profile)
 
     groupsCoords, groups = findSimilarGroups(blocks, blocksCoords, profile)
 
@@ -66,9 +65,9 @@ def bm3dFinal(basicEstimate: np.ndarray, noisyImage: np.ndarray,
     Perform final step of the BM3D with wiener filter
     """
 
-    numbaProfile = profile.toNumbaProfile()
-    estimateBlocks, estimateBlocksCoords = getBlocks(basicEstimate, numbaProfile.blockSize, numbaProfile.blockStep)
-    noisyBlocks, _ = getBlocks(noisyImage, numbaProfile.blockSize, numbaProfile.blockStep)
+    # numbaProfile = profile.toNumbaProfile()
+    estimateBlocks, estimateBlocksCoords = getBlocks(basicEstimate, profile)
+    noisyBlocks, _ = getBlocks(noisyImage, profile)
 
     groupsCoords, estimateGroups = findSimilarGroups(estimateBlocks, estimateBlocksCoords, profile)
 

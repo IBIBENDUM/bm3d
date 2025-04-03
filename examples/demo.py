@@ -30,11 +30,11 @@ def main(imagePath: str="data/cameraman256.png", noiseVariance: int=25) -> None:
         noisyImage = bm3d.addNoise(originalImage, noiseVariance)
 
         profile = bm3d.BM3DProfile(
-            distanceThreshold=193,
-            filterThreshold=3.85,
+            distanceThreshold=80,
+            filterThreshold=2.85,
             searchWindow=10,
             blockStep=10,
-            stages=BM3DStages.BASIC_STAGE,
+            stages=BM3DStages.BOTH_STAGES,
             cores=-1
         )
         denoisedImage, timeResult = bm3d.measureTime(

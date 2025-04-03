@@ -14,16 +14,13 @@ def applyHtToGroup(group: np.ndarray, noiseVariance: float,
     Apply hard-threshold filter to Haar coefficients in group
     """
 
-    detailingCoeffs: np.ndarray = group[:, 1, :]    
+    filteredGroup = group.copy()
+    detailingCoeffs: np.ndarray = filteredGroup[:, 1, :]    
 
-    filteredDetailingCoeffs: np.ndarray = applyHTtoSignal(detailingCoeffs, 
-                                                          noiseVariance, profile)
-    weight = calculateGroupWeightHt(filteredDetailingCoeffs, noiseVariance)
+    detailingCoeffs[:] = applyHTtoSignal(detailingCoeffs, noiseVariance, profile)
+    weight = calculateGroupWeightHt(detailingCoeffs, noiseVariance)
 
-    filteredПroup = group.copy()
-    filteredПroup[:, 1, :] = filteredDetailingCoeffs
-
-    return filteredПroup, weight
+    return filteredGroup, weight
 
 
 def applyHTtoSignal(array: np.ndarray, noiseVariance: float,
