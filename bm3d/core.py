@@ -23,6 +23,7 @@ def bm3d(noisyImage: np.ndarray, noiseVariance: float,
     """
     Apply BM3D method to denoise image
     """
+    # numbaProfile = profile.to_numba_profile()
 
     # Reset task affinity so that all cores are used
     if profile.cores != 1:
@@ -43,7 +44,9 @@ def bm3dBasic(noisyImage: np.ndarray, noiseVariance: float,
     Perform basic step of the BM3D with hard-threshold filter
     """
 
-    blocks, blocksCoords = getBlocks(noisyImage, profile)
+    numbaProfile = profile.toNumbaProfile()
+    print(type(numbaProfile))
+    blocks, blocksCoords = getBlocks(noisyImage, numbaProfile.blockSize, numbaProfile.blockStep)
 
     groupsCoords, groups = findSimilarGroups(blocks, blocksCoords, profile)
 
@@ -63,8 +66,9 @@ def bm3dFinal(basicEstimate: np.ndarray, noisyImage: np.ndarray,
     Perform final step of the BM3D with wiener filter
     """
 
-    estimateBlocks, estimateBlocksCoords = getBlocks(basicEstimate, profile)
-    noisyBlocks, _ = getBlocks(noisyImage, profile)
+    numbaProfile = profile.toNumbaProfile()
+    estimateBlocks, estimateBlocksCoords = getBlocks(basicEstimate, numbaProfile.blockSize, numbaProfile.blockStep)
+    noisyBlocks, _ = getBlocks(noisyImage, numbaProfile.blockSize, numbaProfile.blockStep)
 
     groupsCoords, estimateGroups = findSimilarGroups(estimateBlocks, estimateBlocksCoords, profile)
 

@@ -4,8 +4,9 @@ Functions for finding groups of similar blocks in image
 
 import numpy as np
 from typing import Tuple, List
-from .profile import BM3DProfile
+from .profile import BM3DProfile, NumbaBM3DProfile
 from multiprocessing import Pool
+from numba import njit
 
 def findSimilarBlocksIndices(refBlock: np.ndarray, matchingBlocks: np.ndarray,
                              profile: BM3DProfile) -> np.ndarray:
@@ -176,37 +177,45 @@ def getGroupsFromCoords(
 
     return groups
 
-def getBlocks(noisyImage: np.ndarray, profile: BM3DProfile) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Extract blocks based from image
+from numba import njit, prange
+from typing import Tuple
 
-    Args:
-        noisyImage: Input image
-        profile: BM3D properties
+@njit(fastmath=True, cache=True)
+def computeIndices(imageLength: int, blockSize: int, blockStep: int) -> np.ndarray:
+    """Вычисляет индексы начала блоков вдоль одного измерения изображения"""
+    blocksAmount = max(1, (imageLength - blockSize) // blockStep + 1)
+    return np.arange(0, imageLength - blockSize + 1, blockStep)
 
-    Returns:
-        Tuple:
-            Array of image blocks (numY, numX, blockSize, blockSize)
-            Array of coordinates for each block (numY, numX, 2)
-    """
-    blockSize, blockStep = profile.blockSize, profile.blockStep
+@njit(fastmath=True, cache=True, parallel=True)
+def extract_blocks(noisy_image: np.ndarray, block_size: int, y_indices: np.ndarray, x_indices: np.ndarray) -> np.ndarray:
+    """Формирует массив блоков изображения"""
+    num_y, num_x = len(y_indices), len(x_indices)
+    blocks = np.empty((num_y, num_x, block_size, block_size), dtype=noisy_image.dtype)
+
+    for i in prange(num_y):
+        for j in prange(num_x):
+            blocks[i, j] = noisy_image[y_indices[i]:y_indices[i] + block_size,
+                                       x_indices[j]:x_indices[j] + block_size]
+
+    return blocks
+
+@njit(fastmath=True, cache=True, parallel=True)
+def getBlocks(noisyImage: np.ndarray, blockSize: int, blockStep: int) -> Tuple[np.ndarray, np.ndarray]:
+    """Извлекает блоки из изображения и возвращает их вместе с координатами"""
     imageHeight, imageWidth = noisyImage.shape
 
-    def computeIndices(imageLength: int) -> list:
-        blocksAmount = (imageLength - blockSize) // blockStep + 1
-        if blocksAmount > 1:
-            indices = np.linspace(0, imageLength - blockSize, blocksAmount, dtype=int).tolist()
-        else:
-            indices = [0]
-        return indices
+    yIndices = computeIndices(imageHeight, blockSize, blockStep)
+    xIndices = computeIndices(imageWidth, blockSize, blockStep)
 
-    yIndices = computeIndices(imageHeight)
-    xIndices = computeIndices(imageWidth)
+    blocks = extract_blocks(noisyImage, blockSize, yIndices, xIndices)
 
-    slidingBlocks = np.lib.stride_tricks.sliding_window_view(noisyImage, (blockSize, blockSize))
-    blocks = slidingBlocks[np.ix_(yIndices, xIndices)]
-    
-    yCoords, xCoords = np.meshgrid(yIndices, xIndices, indexing="ij")
-    coords = np.stack((yCoords, xCoords), axis=-1)
-    
+    # Генерация координат без использования meshgrid
+    num_y, num_x = len(yIndices), len(xIndices)
+    coords = np.empty((num_y, num_x, 2), dtype=np.int32)
+
+    for i in prange(num_y):
+        for j in prange(num_x):
+            coords[i, j, 0] = yIndices[i]
+            coords[i, j, 1] = xIndices[j]
+
     return blocks, coords
