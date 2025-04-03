@@ -154,11 +154,9 @@ def applyFilterWie(
 
     filteredGroups = []
     weights = []
-    for groupEstimate, groupCoords in zip(
-        estimateGroups,
-        groupsCoords,
-    ):
-        filteredGroup, weight = filterGroupWie(
+
+    args = [
+        (
             estimateTransformedBlocks,
             noisyTransformedBlocks,
             groupEstimate,
@@ -166,8 +164,12 @@ def applyFilterWie(
             noiseVariance,
             profile,
         )
-        filteredGroups.append(filteredGroup)
-        weights.append(weight)
+        for groupEstimate, groupCoords in zip(estimateGroups, groupsCoords)
+    ]
 
-    return filteredGroups, weights
+    with Pool(processes=profile.cores) as p:
+        results = p.starmap(filterGroupWie, args)
+
+    filteredGroups, weights = zip(*results)
+    return list(filteredGroups), list(weights)
 
