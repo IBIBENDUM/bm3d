@@ -185,6 +185,7 @@ class UNet(nn.Module):
 
         # Final convolution to get the output
         output = self.finalConv(tensor) 
+        output = torch.clamp(output, min=0, max=1)
 
         # Remove padding if static padding was used
         if self.dynamicPadding is False:
