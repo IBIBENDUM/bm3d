@@ -9,7 +9,7 @@ from .profile import BM3DProfile
 from .transforms import *
 
 def applyHtToGroup(group: np.ndarray, noiseVariance: float,
-                      profile: BM3DProfile) -> tuple[np.ndarray, float]:
+                   profile: BM3DProfile) -> tuple[np.ndarray, float]:
     """
     Apply hard-threshold filter to Haar coefficients in group
     """
@@ -17,19 +17,19 @@ def applyHtToGroup(group: np.ndarray, noiseVariance: float,
     filteredGroup = group.copy()
     detailingCoeffs: np.ndarray = filteredGroup[:, 1, :]    
 
-    detailingCoeffs[:] = applyHTtoSignal(detailingCoeffs, noiseVariance, profile)
+    detailingCoeffs[:] = applyHTtoSignal(detailingCoeffs, noiseVariance, profile.filterThreshold)
     weight = calculateGroupWeightHt(detailingCoeffs, noiseVariance)
 
     return filteredGroup, weight
 
 
 def applyHTtoSignal(array: np.ndarray, noiseVariance: float,
-                    profile: BM3DProfile) -> np.ndarray:
+                    filterThreshold: float) -> np.ndarray:
     """
     Apply hard-threshold filter to array
     """
 
-    return np.where(abs(array) < noiseVariance * profile.filterThreshold, 0, array)
+    return np.where(abs(array) < noiseVariance * filterThreshold, 0, array)
 
 
 def calculateGroupWeightHt(detailingCoeffs: np.ndarray, noiseVariance: float) -> float:
@@ -169,4 +169,5 @@ def applyFilterWie(
 
     filteredGroups, weights = zip(*results)
     return list(filteredGroups), list(weights)
+
 

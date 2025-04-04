@@ -9,30 +9,30 @@ import numpy as np
 import pywt
 from numba import njit, prange
 
-@njit(nogil=True, fastmath=True, cache=True)
-def dctnJIT(x, norm=None):
-    return scipy.fft.dctn(x, norm=norm)
-
-@njit(nogil=True, fastmath=True, cache=True)
-def applyToBlocks2dDctJIT(blocks: np.ndarray) -> np.ndarray:
-    """
-    Apply 2D DCT to each block in blocks array
-
-    Args:
-        blocks: array of blocks
-    
-    Return:
-        Array of transformed blocks
-    """
-    transformedBlocks = np.empty_like(blocks, dtype=np.float32)
-
-    for i in prange(blocks.shape[0]): 
-        for j in range(blocks.shape[1]):
-            block = blocks[i, j]
-            dctBlock = dctnJIT(block, norm='ortho')
-            transformedBlocks[i, j] = dctBlock
-
-    return transformedBlocks
+# @njit(nogil=True, fastmath=True, cache=True)
+# def dctnJIT(x, norm=None):
+#     return scipy.fft.dctn(x, norm=norm)
+#
+# @njit(nogil=True, fastmath=True, cache=True)
+# def applyToBlocks2dDctJIT(blocks: np.ndarray) -> np.ndarray:
+#     """
+#     Apply 2D DCT to each block in blocks array
+#
+#     Args:
+#         blocks: array of blocks
+#     
+#     Return:
+#         Array of transformed blocks
+#     """
+#     transformedBlocks = np.empty_like(blocks, dtype=np.float32)
+#
+#     for i in prange(blocks.shape[0]): 
+#         for j in range(blocks.shape[1]):
+#             block = blocks[i, j]
+#             dctBlock = dctnJIT(block, norm='ortho')
+#             transformedBlocks[i, j] = dctBlock
+#
+#     return transformedBlocks
 
 def applyToBlocks2dDct(blocks: np.ndarray) -> np.ndarray:
     """
