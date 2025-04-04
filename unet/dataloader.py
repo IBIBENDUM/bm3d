@@ -13,7 +13,7 @@ class ImageDataset(Dataset):
         "gaussian": (5, 50),
         "salt_pepper": (0.001, 0.1),
         "poisson": (20, 1500),
-        "speckle": (0.05, 0.3),
+        "speckle": (1, 10),
     }
 
     def __init__(
