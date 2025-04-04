@@ -6,40 +6,40 @@ from bm3d.profile import BM3DProfile
 from dataloader import getDataLoader
 from tqdm import tqdm
 
-def generateParameterSamples(nSamples=50, seed=42):
-    """Генерирует точки параметров через LHS."""
-    param_ranges = {
-        "blockSize": [8, 16, 32],
-        "blockStep": [8, 16],
-        "searchWindow": [5, 10, 15],
-        "distanceThreshold": [140, 160, 180, 200],
-        "groupMaxSize": [4, 8, 16, 24],
-        "filterThreshold": np.linspace(3.0, 5.0, 5),
-        "kaiserShape": np.linspace(1.5, 3.0, 5),
+def generate_single_param_samples(param_name, param_values, n_samples=50):
+    """Генерирует параметры, изменяя только один параметр, остальные фиксированы"""
+    base_params = {
+        "distanceThreshold": 170,
+        "filterThreshold": 3.0,
+        "kaiserShape": 2.25
     }
-    return list(ParameterSampler(param_ranges, n_iter=nSamples, random_state=seed))
-
+    
+    samples = []
+    for value in param_values:
+        params = base_params.copy()
+        params[param_name] = value
+        samples.append(params)
+    
+    return samples[:n_samples]
 
 def evaluateBM3D(noisy, clean, params, sigma=25):
     profile = BM3DProfile(
-        blockSize=params["blockSize"],
-        blockStep=params["blockStep"],
-        searchWindow=params["searchWindow"],
         distanceThreshold=params["distanceThreshold"],
-        groupMaxSize=params["groupMaxSize"],
         filterThreshold=params["filterThreshold"],
         kaiserShape=params["kaiserShape"],
     )
     denoised = bm3d.bm3d(noisy, sigma, profile)
-    
     return bm3d.calculatePSNR(clean, denoised)
 
-def evaluateAllSamples(samples, dataloader, nImages):
+def evaluate_parameter(param_name, param_values, dataloader, n_images=5):
+    """Оценивает производительность для одного параметра"""
     results = []
-    for params in tqdm(samples, desc="Evaluating parameters"):
+    samples = generate_single_param_samples(param_name, param_values)
+    
+    for params in tqdm(samples, desc=f"Evaluating {param_name}"):
         psnrs = []
         for i, (cleanTensor, _) in enumerate(dataloader):
-            if i >= nImages:
+            if i >= n_images:
                 break
 
             clean = cleanTensor.numpy()[0, 0]
@@ -48,8 +48,12 @@ def evaluateAllSamples(samples, dataloader, nImages):
             psnr = evaluateBM3D(noisy, clean, params)
             psnrs.append(psnr)
 
-        results.append({**params, "psnr": np.mean(psnrs)})
-    return results
+        results.append({
+            param_name: params[param_name],
+            "psnr": np.mean(psnrs)
+        })
+    
+    return pd.DataFrame(results)
 
 if __name__ == "__main__":
     dataloader = getDataLoader(
@@ -57,10 +61,16 @@ if __name__ == "__main__":
         numWorkers=3,
         augment=False,
         shuffle=False,
-    )  
-
-    samples = generateParameterSamples(nSamples=50)
-
-    results = evaluateAllSamples(samples, dataloader, nImages=10)
-    pd.DataFrame(results).to_csv("bm3d_evaluation.csv", index=False)
-
+    )
+    
+    # Анализируем каждый параметр по отдельности
+    param_ranges = {
+        "filterThreshold": np.linspace(1.0, 5.0, 20),
+        "distanceThreshold": range(140, 201, 5),
+        "kaiserShape": np.linspace(1.5, 3.0, 20),
+    }
+    
+    for param_name, values in param_ranges.items():
+        df = evaluate_parameter(param_name, values, dataloader)
+        # Сохраняем только имя параметра и PSNR
+        df[[param_name, "psnr"]].to_csv(f"bm3d_{param_name}_analysis.csv", index=False)
