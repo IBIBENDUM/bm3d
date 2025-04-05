@@ -2,10 +2,17 @@ from pathlib import Path
 import cv2
 import imagesize
 from typing import Optional
-
+import math
 from sklearn.model_selection import train_test_split
 
 from directory_funcs import createEmptyDirectory
+
+def resizeBySmallerSide(image, targetSize):
+    height, width = image.shape[:2]
+    scale = targetSize / min(width, height)
+    newWidth = math.ceil(width * scale) 
+    newHeight = math.ceil(height * scale)
+    return cv2.resize(image, (newWidth, newHeight), interpolation=cv2.INTER_AREA)
 
 def cropImage(image, cropSize = (128, 128)):
     height, width = image.shape[:2]
@@ -28,6 +35,7 @@ def getValidImagePaths(sourceDir, minSize=(512,512)):
 def processAndSaveImage(srcPath, dstPath, cropSize=None):
     image = cv2.imread(srcPath, cv2.IMREAD_GRAYSCALE)
     if cropSize is not None:
+        image = resizeBySmallerSide(image, cropSize[0])
         image = cropImage(image, cropSize)
     cv2.imwrite(dstPath, image)
 
