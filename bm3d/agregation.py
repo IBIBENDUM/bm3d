@@ -46,6 +46,10 @@ def agregateGroup(numeratorSharedName, denominatorSharedName,
         numerator[y : y + blockSize, x : x + blockSize] += block * weight * kaiserWindow
         denominator[y : y + blockSize, x : x + blockSize] += weight * kaiserWindow
 
+    # epsilon = 1e-8  # Очень маленькое значение, чтобы избежать деления на ноль
+    #
+    # safe_denominator = np.where(denominator == 0, epsilon, denominator)  # Заменить нули на epsilon
+
     numeratorShared.close()
     denominatorShared.close()
 
@@ -100,7 +104,11 @@ def globalAgregation(imageShape: Tuple[int, int], groups: List[np.ndarray],
     with Pool(processes=cpu_count()) as p:
         p.starmap(agregateGroup, args)
 
-    result = numerator / denominator
+ 
+    epsilon = np.finfo(np.float64).eps 
+    safe_denominator = np.where(denominator == 0, epsilon, denominator)
+    result = numerator / safe_denominator
+    # result = numerator / denominator
 
     numeratorShared.close()
     numeratorShared.unlink()
