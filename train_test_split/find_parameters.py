@@ -61,9 +61,16 @@ def processBatch(noisyImages, cleanImages, noiseVariance, profile):
 
 def processDataset(filterThreshold, dataLoader, noiseVariance):
     totalPsnr = 0.0
-    profile = BM3DProfile(filterThreshold=filterThreshold / 100,
-                          stages=BM3DStages.BASIC_STAGE)
-
+    profile = BM3DProfile(
+            distanceThreshold=3000,
+            filterThreshold=filterThreshold,
+            searchWindow=10,
+            blockStep=3,
+            blockSize=8,
+            groupMaxSize=16,
+            stages=BM3DStages.BOTH_STAGES,
+            cores=-1
+        )
     totalImages = len(dataLoader.dataset)
     for noisyImages, cleanImages in dataLoader:
         batchPsnr = processBatch(
@@ -91,7 +98,7 @@ def plotGp(optimizer, xObs, yObs, range):
     axis = plt.subplot(gs[0])
     acq = plt.subplot(gs[1])
 
-    xGrid = np.linspace(range[0], range[1], 400).reshape(-1, 1)
+    xGrid = np.linspace(range[0], range[1], 1000).reshape(-1, 1)
 
     optimizer.acquisition_function._fit_gp(optimizer._gp, optimizer._space)
     mu, sigma = optimizer._gp.predict(xGrid, return_std=True)
@@ -137,7 +144,7 @@ def loadOptimizerState(filename):
         return None
 
 def optimizeParameters(dataLoader, noiseVariance):
-    filterThresholdRange = (200, 400) 
+    filterThresholdRange = (2.00, 4.00) 
     paramBounds = {
         'filterThreshold': filterThresholdRange
     }
@@ -153,9 +160,9 @@ def optimizeParameters(dataLoader, noiseVariance):
             random_state=0
         )
 
-    kernel = kernels.ConstantKernel(1.0, (10, 50)) + kernels.Matern(length_scale=100) 
+    kernel = kernels.ConstantKernel(1.0, (10, 50)) + kernels.Matern(length_scale=0.01) 
     optimizer.set_gp_params(kernel=kernel, alpha=1e-5)  
-    optimizer.maximize(init_points=15, n_iter=15)  
+    optimizer.maximize(init_points=30, n_iter=30)  
 
     saveOptimizerState(optimizer, "optimizer_state.pkl")
 
@@ -177,8 +184,8 @@ if __name__ == "__main__":
     setSeeds()
     setupLogging()
 
-    cleanTrainDir = "dataset/dataset/clean"
-    noisyTrainDir = "dataset/dataset/train"
+    cleanTrainDir = "dataset/clean"
+    noisyTrainDir = "dataset/train"
 
     bestParams = trainModel(cleanTrainDir, noisyTrainDir, noiseVariance=25)
 
