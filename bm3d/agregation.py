@@ -100,7 +100,9 @@ def globalAgregation(imageShape: Tuple[int, int], groups: List[np.ndarray],
     with Pool(processes=cpu_count()) as p:
         p.starmap(agregateGroup, args)
 
-    result = numerator / denominator
+    # result = numerator / np.
+    epsilon = 1e-10
+    result = numerator / np.where(denominator == 0, epsilon, denominator)
 
     numeratorShared.close()
     numeratorShared.unlink()
