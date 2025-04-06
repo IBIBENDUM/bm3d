@@ -7,7 +7,7 @@ from scipy.fft import dctn, idctn
 from typing import List, Tuple
 import numpy as np
 import pywt
-from numba import njit, prange
+# from numba import njit, prange
 
 # @njit(nogil=True, fastmath=True, cache=True)
 # def dctnJIT(x, norm=None):
