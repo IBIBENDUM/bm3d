@@ -30,10 +30,12 @@ def main(imagePath: str="data/cameraman256.png", noiseVariance: int=25) -> None:
         noisyImage = bm3d.addNoise(originalImage, noiseVariance)
 
         profile = bm3d.BM3DProfile(
-            distanceThreshold=80,
-            filterThreshold=2.85,
+            distanceThreshold=3000,
+            filterThreshold=2.75,
             searchWindow=10,
-            blockStep=10,
+            blockStep=3,
+            blockSize=8,
+            groupMaxSize=16,
             stages=BM3DStages.BOTH_STAGES,
             cores=-1
         )
@@ -119,7 +121,7 @@ def parseArguments() -> argparse.Namespace:
         "-s",
         "--sigma",
         type=int,
-        default=10,
+        default=25,
         help="Noise variance",
         metavar="\b",
     )
