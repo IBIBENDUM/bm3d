@@ -21,8 +21,7 @@ and detail preservation
 
 1. **Clone this repository**:
 ```bash
-    git clone --depth=1
-    https://github.com/IBIBENUDM/bm3d.git
+    git clone --depth=1 https://github.com/IBIBENUDM/bm3d.git
 ```
 2. **Install Package**:
 ```bash
