@@ -42,20 +42,21 @@ visualize the results
 
 - `dev` - Development of new features, improvements and bug fixes
 
-- `train-test-split` - Selecting the optimal parameters
+- `bayessian-optimization` - Finding optimal hard threshold value
 
+- `unet` - U-Net realization for image denoising
 ## Roadmap 🗺️
 
 ### Current Status ✅
 - [x] **Basic Two-Stage Implementation**
 - [x] **Optimizations from the Original Paper**
 - [x] **Multithreading Support**
-- [x] **Parameter Optimization on Train/Test Data**
+- [x] **Parameter Optimization via bayessian optimization**
+- [x] **Implement U-Net Model** 
+- [x] **Implement Numba**
 
 ### Future Goals 🚀
-- [ ] **Implement U-Net Model** 
 - [ ] **Optimize Key Functions in C++**
-- [ ] **Implement Numba**
 - [ ] **Benchmark Against Other Methods**
 
 ## License 📜
